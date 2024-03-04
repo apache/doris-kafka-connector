@@ -18,14 +18,14 @@
 #
 
 ---
-name: Build Extensions
+name: Build Doris Kafka Connector
 on:
   pull_request:
   push:
 
 jobs:
   build-extension:
-    name: "Build Extensions"
+    name: "Build Doris Kafka Connector"
     runs-on: ubuntu-latest
     defaults:
       run:
