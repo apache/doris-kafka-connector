@@ -1,0 +1,8 @@
+target/
+
+.idea
+*.iml
+*.DS_Store
+.cache
+dist
+dependency-reduced-pom.xml
