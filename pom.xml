@@ -21,18 +21,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
-    <licenses>
-        <license>
-            <name>The Apache Software License, Version 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-        </license>
-    </licenses>
-    <scm>
-        <url>https://github.com/selectdb/doris-kafka-connector</url>
-        <connection>https://github.com/selectdb/doris-kafka-connector.git</connection>
-    </scm>
-
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.apache.doris</groupId>
     <artifactId>doris-kafka-connector</artifactId>
@@ -41,6 +29,41 @@
     <name>Doris-Kafka-Connector</name>
     <description>Doris Kafka Connector</description>
     <url>https://doris.apache.org/</url>
+
+    <licenses>
+        <license>
+            <name>Apache 2.0 License</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.html</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://git@github.com:apache/doris-kafka-connector.git</connection>
+        <developerConnection>scm:git:https://git@github.com:apache/doris-kafka-connector.git</developerConnection>
+        <url>scm:git:https://git@github.com:apache/doris-kafka-connector.git</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/apache/doris/issues</url>
+    </issueManagement>
+
+    <mailingLists>
+        <mailingList>
+            <name>Dev Mailing List</name>
+            <post>dev@doris.apache.org</post>
+            <subscribe>dev-subscribe@doris.apache.org</subscribe>
+            <unsubscribe>dev-unsubscribe@doris.apache.org</unsubscribe>
+        </mailingList>
+        <mailingList>
+            <name>Commits Mailing List</name>
+            <post>commits@doris.apache.org</post>
+            <subscribe>commits-subscribe@doris.apache.org</subscribe>
+            <unsubscribe>commits-unsubscribe@doris.apache.org</unsubscribe>
+        </mailingList>
+    </mailingLists>
 
     <!-- Set our Language Level to Java 8 -->
     <properties>

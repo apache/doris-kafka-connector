@@ -126,7 +126,10 @@ public class DorisOptions {
         setStreamLoadDefaultValues();
         for (Map.Entry<String, String> entry : config.entrySet()) {
             if (entry.getKey().startsWith(DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX)) {
-                String subKey = entry.getKey().substring(DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX.length());
+                String subKey =
+                        entry.getKey()
+                                .substring(
+                                        DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX.length());
                 streamLoadProp.put(subKey, entry.getValue());
             }
         }

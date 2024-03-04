@@ -38,5 +38,4 @@ public class DistributedTest {
         params[0] = distributed;
         ConnectDistributed.main(params);
     }
-
 }
