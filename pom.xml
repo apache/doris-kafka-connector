@@ -260,20 +260,6 @@
                     <artifactId>maven-shade-plugin</artifactId>
                     <version>3.2.4</version>
                     <configuration>
-                        <relocations>
-                            <relocation>
-                                <pattern>com.fasterxml.jackson</pattern>
-                                <shadedPattern>com.selectdb.kafka.shaded.com.fasterxml.jackson</shadedPattern>
-                            </relocation>
-                            <relocation>
-                                <pattern>org.apache.commons.codec</pattern>
-                                <shadedPattern>com.selectdb.kafka.shaded.org.apache.commons.codec</shadedPattern>
-                            </relocation>
-                            <relocation>
-                                <pattern>com.google.flatbuffers</pattern>
-                                <shadedPattern>com.selectdb.kafka.shaded.com.google.flatbuffers</shadedPattern>
-                            </relocation>
-                        </relocations>
                     </configuration>
                     <executions>
                         <execution>
