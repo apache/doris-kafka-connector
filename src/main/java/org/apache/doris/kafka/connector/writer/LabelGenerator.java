@@ -44,9 +44,9 @@ public class LabelGenerator {
             int subtaskId) {
         this(labelPrefix, enable2PC);
         // The label of stream load can not contain `.`
-        this.tableIdentifier = tableIdentifier.replace(".", "_");
+        this.tableIdentifier = tableIdentifier.replaceAll("\\.", "_");
+        this.topic = topic.replaceAll("\\.", "_");
         this.subtaskId = subtaskId;
-        this.topic = topic;
         this.partition = partition;
     }
 

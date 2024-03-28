@@ -100,12 +100,13 @@ public class StreamLoadWriter extends DorisWriter {
     @VisibleForTesting
     public Map<String, String> fetchLabel2Status() {
         String queryPatten = String.format(TRANSACTION_LABEL_PATTEN, dorisOptions.getDatabase());
-        String tmpTableIdentifier = tableIdentifier.replace(".", "_");
+        String tmpTableIdentifier = tableIdentifier.replaceAll("\\.", "_");
+        String tmpTopic = topic.replaceAll("\\.", "_");
         String querySQL =
                 queryPatten
                         + dorisOptions.getLabelPrefix()
                         + LoadConstants.FILE_DELIM_DEFAULT
-                        + topic
+                        + tmpTopic
                         + LoadConstants.FILE_DELIM_DEFAULT
                         + partition
                         + LoadConstants.FILE_DELIM_DEFAULT
