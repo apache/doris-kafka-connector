@@ -105,7 +105,8 @@ public class TestRecordService {
                 TestRecordBuffer.newSinkRecord(
                         noDeleteSchemaValue.value(), 8, noDeleteSchemaValue.schema());
         String noDeleteResult = recordService.processStructRecord(noDeleteSinkRecord);
-        Assert.assertEquals("{\"id\":19,\"name\":\"fff\"}", noDeleteResult);
+        Assert.assertEquals(
+                "{\"id\":19,\"name\":\"fff\",\"__DORIS_DELETE_SIGN__\":\"0\"}", noDeleteResult);
 
         // delete value
         String deleteValue =

@@ -75,6 +75,7 @@ public class RecordService {
                     return MAPPER.writeValueAsString(beforeValue);
                 }
                 Map<String, Object> afterValue = (Map<String, Object>) recordMap.get("after");
+                afterValue.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_FALSE);
                 return MAPPER.writeValueAsString(afterValue);
             }
         } catch (JsonProcessingException e) {
