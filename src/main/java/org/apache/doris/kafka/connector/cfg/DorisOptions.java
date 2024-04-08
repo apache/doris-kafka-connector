@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
+import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
@@ -59,6 +60,7 @@ public class DorisOptions {
     private String labelPrefix;
     private LoadModel loadModel;
     private DeliveryGuarantee deliveryGuarantee;
+    private ConverterMode converterMode;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -79,6 +81,11 @@ public class DorisOptions {
                         config.getOrDefault(
                                 DorisSinkConnectorConfig.DELIVERY_GUARANTEE,
                                 DorisSinkConnectorConfig.DELIVERY_GUARANTEE_DEFAULT));
+        this.converterMode =
+                ConverterMode.of(
+                        config.getOrDefault(
+                                DorisSinkConnectorConfig.CONVERT_MODE,
+                                DorisSinkConnectorConfig.CONVERT_MODE_DEFAULT));
 
         this.fileSize = Integer.parseInt(config.get(DorisSinkConnectorConfig.BUFFER_SIZE_BYTES));
         this.recordNum =
@@ -258,6 +265,10 @@ public class DorisOptions {
 
     public DeliveryGuarantee getDeliveryGuarantee() {
         return this.deliveryGuarantee;
+    }
+
+    public ConverterMode getConverterMode() {
+        return this.converterMode;
     }
 
     public boolean isAutoRedirect() {

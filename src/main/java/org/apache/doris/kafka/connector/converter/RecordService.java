@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.DataFormatException;
 import org.apache.doris.kafka.connector.writer.LoadConstants;
 import org.apache.doris.kafka.connector.writer.RecordBuffer;
@@ -41,9 +42,18 @@ public class RecordService {
     private static final Logger LOG = LoggerFactory.getLogger(RecordService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final JsonConverter converter;
+    private DorisOptions dorisOptions;
 
     public RecordService() {
         this.converter = new JsonConverter();
+        Map<String, Object> converterConfig = new HashMap<>();
+        converterConfig.put("schemas.enable", "false");
+        this.converter.configure(converterConfig, false);
+    }
+
+    public RecordService(DorisOptions dorisOptions) {
+        this.converter = new JsonConverter();
+        this.dorisOptions = dorisOptions;
         Map<String, Object> converterConfig = new HashMap<>();
         converterConfig.put("schemas.enable", "false");
         this.converter.configure(converterConfig, false);
@@ -58,19 +68,20 @@ public class RecordService {
                 converter.fromConnectData(record.topic(), record.valueSchema(), record.value());
         String recordValue = new String(bytes, StandardCharsets.UTF_8);
         try {
-            // delete sign sync
             Map<String, Object> recordMap =
                     MAPPER.readValue(recordValue, new TypeReference<Map<String, Object>>() {});
-            if (Boolean.parseBoolean(
-                    recordMap.getOrDefault(LoadConstants.DELETE_KET, false).toString())) {
-                recordMap.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_TRUE);
-            } else {
-                recordMap.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_FALSE);
+            if (ConverterMode.DEBEZIUM_INGESTION == dorisOptions.getConverterMode()) {
+                // delete sign sync
+                if ("d".equals(recordMap.get("op"))) {
+                    Map<String, Object> beforeValue = (Map<String, Object>) recordMap.get("before");
+                    beforeValue.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_TRUE);
+                    return MAPPER.writeValueAsString(beforeValue);
+                }
+                Map<String, Object> afterValue = (Map<String, Object>) recordMap.get("after");
+                return MAPPER.writeValueAsString(afterValue);
             }
-            recordMap.remove(LoadConstants.DELETE_KET);
-            recordValue = MAPPER.writeValueAsString(recordMap);
         } catch (JsonProcessingException e) {
-            LOG.error("Add delete sign failed, cause by parse json error: {}", recordValue);
+            LOG.error("parse record failed, cause by parse json error: {}", recordValue);
         }
         return recordValue;
     }
