@@ -64,10 +64,10 @@ public class RecordService {
         byte[] bytes =
                 converter.fromConnectData(record.topic(), record.valueSchema(), record.value());
         String recordValue = new String(bytes, StandardCharsets.UTF_8);
-        try {
-            Map<String, Object> recordMap =
-                    MAPPER.readValue(recordValue, new TypeReference<Map<String, Object>>() {});
-            if (ConverterMode.DEBEZIUM_INGESTION == dorisOptions.getConverterMode()) {
+        if (ConverterMode.DEBEZIUM_INGESTION == dorisOptions.getConverterMode()) {
+            try {
+                Map<String, Object> recordMap =
+                        MAPPER.readValue(recordValue, new TypeReference<Map<String, Object>>() {});
                 // delete sign sync
                 if ("d".equals(recordMap.get("op"))) {
                     Map<String, Object> beforeValue = (Map<String, Object>) recordMap.get("before");
@@ -77,9 +77,9 @@ public class RecordService {
                 Map<String, Object> afterValue = (Map<String, Object>) recordMap.get("after");
                 afterValue.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_FALSE);
                 return MAPPER.writeValueAsString(afterValue);
+            } catch (JsonProcessingException e) {
+                LOG.error("parse record failed, cause by parse json error: {}", recordValue);
             }
-        } catch (JsonProcessingException e) {
-            LOG.error("parse record failed, cause by parse json error: {}", recordValue);
         }
         return recordValue;
     }
