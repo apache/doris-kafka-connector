@@ -52,11 +52,8 @@ public class RecordService {
     }
 
     public RecordService(DorisOptions dorisOptions) {
-        this.converter = new JsonConverter();
+        this();
         this.dorisOptions = dorisOptions;
-        Map<String, Object> converterConfig = new HashMap<>();
-        converterConfig.put("schemas.enable", "false");
-        this.converter.configure(converterConfig, false);
     }
 
     /**
