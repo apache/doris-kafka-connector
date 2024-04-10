@@ -93,7 +93,7 @@ public abstract class DorisWriter {
 
         this.dorisOptions = dorisOptions;
         this.connectionProvider = connectionProvider;
-        this.recordService = new RecordService();
+        this.recordService = new RecordService(dorisOptions);
         this.connectMonitor = connectMonitor;
     }
 

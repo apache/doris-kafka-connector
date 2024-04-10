@@ -22,6 +22,7 @@ package org.apache.doris.kafka.connector.cfg;
 import java.time.Duration;
 import java.util.Map;
 import org.apache.doris.kafka.connector.DorisSinkConnector;
+import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
@@ -73,6 +74,8 @@ public class DorisSinkConnectorConfig {
     public static final String AUTO_REDIRECT = "auto.redirect";
     public static final String DELIVERY_GUARANTEE = "delivery.guarantee";
     public static final String DELIVERY_GUARANTEE_DEFAULT = DeliveryGuarantee.AT_LEAST_ONCE.name();
+    public static final String CONVERT_MODE = "converter.mode";
+    public static final String CONVERT_MODE_DEFAULT = ConverterMode.NORMAL.getName();
     // Prefix for Doris StreamLoad specific properties.
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
 
