@@ -69,6 +69,8 @@ public class DorisSinkConnectorConfig {
     public static final String REQUEST_CONNECT_TIMEOUT_MS = "request.connect.timeout.ms";
     public static final Integer DORIS_REQUEST_READ_TIMEOUT_MS_DEFAULT = 30 * 1000;
     public static final Integer DORIS_REQUEST_CONNECT_TIMEOUT_MS_DEFAULT = 30 * 1000;
+    public static final String DATABASE_TIME_ZONE = "database.time_zone";
+    public static final String DATABASE_TIME_ZONE_DEFAULT = "UTC";
     public static final String LOAD_MODEL = "load.model";
     public static final String LOAD_MODEL_DEFAULT = LoadModel.STREAM_LOAD.name();
     public static final String AUTO_REDIRECT = "auto.redirect";
