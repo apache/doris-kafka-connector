@@ -81,11 +81,7 @@ public class RecordDescriptor {
     }
 
     public boolean isTombstone() {
-        // NOTE
-        // Debezium TOMBSTONE has both value and valueSchema to null, instead the
-        // ExtractNewRecordState SMT with delete.handling.mode=none will generate
-        // a record only with value null that by JDBC connector is treated as a flattened delete.
-        // See isDelete method.
+        // Debezium TOMBSTONE has both value and valueSchema to null.
         return record.value() == null && record.valueSchema() == null;
     }
 
