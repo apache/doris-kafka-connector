@@ -78,9 +78,18 @@
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <confluent.version>7.2.1</confluent.version>
+        <kafka.version>2.5.1</kafka.version>
         <avro.version>1.11.3</avro.version>
         <metrics.version>4.2.25</metrics.version>
         <spotless.version>2.4.2</spotless.version>
+        <debezium.version>1.9.8.Final</debezium.version>
+        <mockito.version>2.27.0</mockito.version>
+        <junit.version>4.13.1</junit.version>
+        <slf4j.version>1.7.25</slf4j.version>
+        <mysql-connector.version>8.0.30</mysql-connector.version>
+        <jackson.version>2.13.2.1</jackson.version>
+        <httpcomponents.version>4.5.13</httpcomponents.version>
+        <commons-io.version>2.3</commons-io.version>
     </properties>
 
     <repositories>
@@ -95,13 +104,13 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.3</version>
+            <version>${commons-io.version}</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.kafka/connect-api -->
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-api</artifactId>
-            <version>2.5.1</version>
+            <version>${kafka.version}</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
@@ -129,47 +138,47 @@
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-runtime</artifactId>
-            <version>2.5.1</version>
+            <version>${kafka.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.13.2.1</version>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.13</version>
+            <version>${httpcomponents.version}</version>
         </dependency>
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.30</version>
+            <version>${mysql-connector.version}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.25</version>
+            <version>${slf4j.version}</version>
         </dependency>
 
         <!--junit for unit test-->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.13.1</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.25</version>
+            <version>${slf4j.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>2.27.0</version>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -254,7 +263,7 @@
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-core</artifactId>
-            <version>1.9.8.Final</version>
+            <version>${debezium.version}</version>
         </dependency>
     </dependencies>
 
