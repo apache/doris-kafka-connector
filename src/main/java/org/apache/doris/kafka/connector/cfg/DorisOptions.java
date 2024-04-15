@@ -58,6 +58,7 @@ public class DorisOptions {
     private final Properties streamLoadProp = new Properties();
 
     private String labelPrefix;
+    private String databaseTimeZone;
     private LoadModel loadModel;
     private DeliveryGuarantee deliveryGuarantee;
     private ConverterMode converterMode;
@@ -71,6 +72,10 @@ public class DorisOptions {
         this.password = config.get(DorisSinkConnectorConfig.DORIS_PASSWORD);
         this.database = config.get(DorisSinkConnectorConfig.DORIS_DATABASE);
         this.taskId = Integer.parseInt(config.get(ConfigCheckUtils.TASK_ID));
+        this.databaseTimeZone = DorisSinkConnectorConfig.DATABASE_TIME_ZONE_DEFAULT;
+        if (config.containsKey(DorisSinkConnectorConfig.DATABASE_TIME_ZONE)) {
+            this.databaseTimeZone = config.get(DorisSinkConnectorConfig.DATABASE_TIME_ZONE);
+        }
         this.loadModel =
                 LoadModel.of(
                         config.getOrDefault(
@@ -273,6 +278,10 @@ public class DorisOptions {
 
     public boolean isAutoRedirect() {
         return autoRedirect;
+    }
+
+    public String getDatabaseTimeZone() {
+        return databaseTimeZone;
     }
 
     public boolean isEnableDelete() {

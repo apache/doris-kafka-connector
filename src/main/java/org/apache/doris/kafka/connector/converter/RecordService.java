@@ -20,19 +20,22 @@
 package org.apache.doris.kafka.connector.converter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.StringJoiner;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.converter.type.Type;
 import org.apache.doris.kafka.connector.exception.DataFormatException;
 import org.apache.doris.kafka.connector.writer.LoadConstants;
 import org.apache.doris.kafka.connector.writer.RecordBuffer;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
@@ -43,6 +46,7 @@ public class RecordService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final JsonConverter converter;
     private DorisOptions dorisOptions;
+    private RecordTypeRegister recordTypeRegister;
 
     public RecordService() {
         this.converter = new JsonConverter();
@@ -54,6 +58,7 @@ public class RecordService {
     public RecordService(DorisOptions dorisOptions) {
         this();
         this.dorisOptions = dorisOptions;
+        this.recordTypeRegister = new RecordTypeRegister(dorisOptions);
     }
 
     /**
@@ -61,27 +66,34 @@ public class RecordService {
      * "optional": false, "name": "" }, "payload": { "name": "doris", "__deleted": "true" } }
      */
     public String processStructRecord(SinkRecord record) {
-        byte[] bytes =
-                converter.fromConnectData(record.topic(), record.valueSchema(), record.value());
-        String recordValue = new String(bytes, StandardCharsets.UTF_8);
+        String processedRecord;
         if (ConverterMode.DEBEZIUM_INGESTION == dorisOptions.getConverterMode()) {
-            try {
-                Map<String, Object> recordMap =
-                        MAPPER.readValue(recordValue, new TypeReference<Map<String, Object>>() {});
-                // delete sign sync
-                if ("d".equals(recordMap.get("op"))) {
-                    Map<String, Object> beforeValue = (Map<String, Object>) recordMap.get("before");
-                    beforeValue.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_TRUE);
-                    return MAPPER.writeValueAsString(beforeValue);
-                }
-                Map<String, Object> afterValue = (Map<String, Object>) recordMap.get("after");
-                afterValue.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_FALSE);
-                return MAPPER.writeValueAsString(afterValue);
-            } catch (JsonProcessingException e) {
-                LOG.error("parse record failed, cause by parse json error: {}", recordValue);
+            RecordDescriptor recordDescriptor = buildRecordDescriptor(record);
+            if (recordDescriptor.isTombstone()) {
+                return null;
             }
+            List<String> nonKeyFieldNames = recordDescriptor.getNonKeyFieldNames();
+            if (recordDescriptor.isDelete()) {
+                processedRecord =
+                        parseFieldValues(
+                                recordDescriptor,
+                                recordDescriptor.getBeforeStruct(),
+                                nonKeyFieldNames,
+                                true);
+            } else {
+                processedRecord =
+                        parseFieldValues(
+                                recordDescriptor,
+                                recordDescriptor.getAfterStruct(),
+                                nonKeyFieldNames,
+                                false);
+            }
+        } else {
+            byte[] bytes =
+                    converter.fromConnectData(record.topic(), record.valueSchema(), record.value());
+            processedRecord = new String(bytes, StandardCharsets.UTF_8);
         }
-        return recordValue;
+        return processedRecord;
     }
 
     /** process list record from kafka [{"name":"doris1"},{"name":"doris2"}] */
@@ -114,6 +126,43 @@ public class RecordService {
         return record.value().toString();
     }
 
+    private String parseFieldValues(
+            RecordDescriptor record, Struct source, List<String> fields, boolean isDelete) {
+        Map<String, Object> filedMapping = new LinkedHashMap<>();
+        String filedResult = null;
+        final Map<String, Type> typeRegistry = recordTypeRegister.getTypeRegistry();
+        for (String fieldName : fields) {
+            final RecordDescriptor.FieldDescriptor field = record.getFields().get(fieldName);
+            String fieldSchemaName = field.getSchemaName();
+            String fieldSchemaTypeName = field.getSchemaTypeName();
+            Object value =
+                    field.getSchema().isOptional()
+                            ? source.getWithoutDefault(fieldName)
+                            : source.get(fieldName);
+            Type type =
+                    Objects.nonNull(fieldSchemaName)
+                            ? typeRegistry.get(fieldSchemaName)
+                            : typeRegistry.get(fieldSchemaTypeName);
+            Object convertValue = type.getValue(value);
+            if (Objects.nonNull(convertValue) && !type.isNumber()) {
+                filedMapping.put(fieldName, convertValue.toString());
+            } else {
+                filedMapping.put(fieldName, convertValue);
+            }
+        }
+        try {
+            if (isDelete) {
+                filedMapping.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_TRUE);
+            } else {
+                filedMapping.put(LoadConstants.DORIS_DELETE_SIGN, LoadConstants.DORIS_DEL_FALSE);
+            }
+            filedResult = MAPPER.writeValueAsString(filedMapping);
+        } catch (JsonProcessingException e) {
+            LOG.error("parse record failed, cause by parse json error: {}", filedMapping);
+        }
+        return filedResult;
+    }
+
     /**
      * Given a single Record from put API, process it and convert it into a Json String.
      *
@@ -121,14 +170,26 @@ public class RecordService {
      * @return Json String
      */
     public String getProcessedRecord(SinkRecord record) {
+        String processedRecord;
         if (record.value() instanceof Struct) {
-            return processStructRecord(record);
+            processedRecord = processStructRecord(record);
         } else if (record.value() instanceof List) {
-            return processListRecord(record);
+            processedRecord = processListRecord(record);
         } else if (record.value() instanceof Map) {
-            return processMapRecord(record);
+            processedRecord = processMapRecord(record);
         } else {
-            return processStringRecord(record);
+            processedRecord = record.value().toString();
         }
+        return processedRecord;
+    }
+
+    private RecordDescriptor buildRecordDescriptor(SinkRecord record) {
+        RecordDescriptor recordDescriptor;
+        try {
+            recordDescriptor = RecordDescriptor.builder().withSinkRecord(record).build();
+        } catch (Exception e) {
+            throw new ConnectException("Failed to process a sink record", e);
+        }
+        return recordDescriptor;
     }
 }
