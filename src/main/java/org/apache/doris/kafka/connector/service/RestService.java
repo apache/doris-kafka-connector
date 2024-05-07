@@ -20,6 +20,7 @@
 package org.apache.doris.kafka.connector.service;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -39,19 +40,29 @@ import org.apache.commons.io.IOUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.ConnectedFailedException;
 import org.apache.doris.kafka.connector.exception.DorisException;
+import org.apache.doris.kafka.connector.exception.SchemaChangeException;
 import org.apache.doris.kafka.connector.model.BackendV2;
 import org.apache.doris.kafka.connector.model.LoadOperation;
+import org.apache.doris.kafka.connector.model.doris.Schema;
 import org.apache.doris.kafka.connector.utils.BackoffAndRetryUtils;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 
 public class RestService {
 
     private static final String BACKENDS_V2 = "/api/backends?is_alive=true";
+    private static final String TABLE_SCHEMA_API = "http://%s/api/%s/%s/_schema";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /**
      * get Doris BE nodes to request.
@@ -284,5 +295,53 @@ public class RestService {
         List<BackendV2.BackendRowV2> backendRows = backend.getBackends();
         logger.debug("Parsing schema result is '{}'.", backendRows);
         return backendRows;
+    }
+
+    /** Get table schema from doris. */
+    public static Schema getSchema(
+            DorisOptions dorisOptions, String db, String table, Logger logger) {
+        logger.trace("start get " + db + "." + table + " schema from doris.");
+        Object responseData = null;
+        try {
+            String tableSchemaUri =
+                    String.format(TABLE_SCHEMA_API, dorisOptions.getHttpUrl(), db, table);
+            HttpGet httpGet = new HttpGet(tableSchemaUri);
+            httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader(dorisOptions));
+            Map<String, Object> responseMap = handleResponse(httpGet, logger);
+            responseData = responseMap.get("data");
+            String schemaStr = OBJECT_MAPPER.writeValueAsString(responseData);
+            return OBJECT_MAPPER.readValue(schemaStr, Schema.class);
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            throw new SchemaChangeException("can not parse response schema " + responseData, e);
+        }
+    }
+
+    private static String authHeader(DorisOptions dorisOptions) {
+        return "Basic "
+                + new String(
+                        org.apache.commons.codec.binary.Base64.encodeBase64(
+                                (dorisOptions.getUser() + ":" + dorisOptions.getPassword())
+                                        .getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static Map handleResponse(HttpUriRequest request, Logger logger) {
+        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+            CloseableHttpResponse response = httpclient.execute(request);
+            final int statusCode = response.getStatusLine().getStatusCode();
+            final String reasonPhrase = response.getStatusLine().getReasonPhrase();
+            if (statusCode == 200 && response.getEntity() != null) {
+                String responseEntity = EntityUtils.toString(response.getEntity());
+                return OBJECT_MAPPER.readValue(responseEntity, Map.class);
+            } else {
+                throw new SchemaChangeException(
+                        "Failed to schemaChange, status: "
+                                + statusCode
+                                + ", reason: "
+                                + reasonPhrase);
+            }
+        } catch (Exception e) {
+            logger.trace("SchemaChange request error,", e);
+            throw new SchemaChangeException("SchemaChange request error with " + e.getMessage());
+        }
     }
 }

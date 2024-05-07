@@ -58,6 +58,7 @@ public abstract class DorisWriter {
     protected RecordService recordService;
     protected int taskId;
     protected final DorisConnectMonitor connectMonitor;
+    protected boolean schemaChange;
 
     public DorisWriter(
             String topic,
@@ -100,7 +101,9 @@ public abstract class DorisWriter {
     /** read offset from doris */
     public abstract void fetchOffset();
 
-    public void insert(final SinkRecord record) {
+    public void insert(final SinkRecord record) {}
+
+    protected void initRecord(final SinkRecord record) {
         // init offset
         if (!hasInitialized
                 && DeliveryGuarantee.EXACTLY_ONCE.equals(dorisOptions.getDeliveryGuarantee())) {
@@ -113,7 +116,9 @@ public abstract class DorisWriter {
             fetchOffset();
             this.hasInitialized = true;
         }
+    }
 
+    protected void insertRecord(final SinkRecord record) {
         // discard the record if the record offset is smaller or equal to server side offset
         if (record.kafkaOffset() > this.offsetPersistedInDoris.get()
                 && record.kafkaOffset() > processedOffset.get()) {

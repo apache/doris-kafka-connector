@@ -33,6 +33,7 @@ import org.apache.doris.kafka.connector.exception.CopyLoadException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.utils.FileNameUtils;
 import org.apache.doris.kafka.connector.writer.load.CopyLoad;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +102,12 @@ public class CopyIntoWriter extends DorisWriter {
                     ex);
         }
         return loadFileList;
+    }
+
+    @Override
+    public void insert(SinkRecord record) {
+        initRecord(record);
+        insertRecord(record);
     }
 
     @Override

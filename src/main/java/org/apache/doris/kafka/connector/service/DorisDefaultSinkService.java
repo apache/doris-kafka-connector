@@ -23,6 +23,7 @@ import com.codahale.metrics.MetricRegistry;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.doris.kafka.connector.DorisSinkTask;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
@@ -34,6 +35,7 @@ import org.apache.doris.kafka.connector.writer.CopyIntoWriter;
 import org.apache.doris.kafka.connector.writer.DorisWriter;
 import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
+import org.apache.doris.kafka.connector.writer.schema.DebeziumSchemaChange;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -86,15 +88,23 @@ public class DorisDefaultSinkService implements DorisSinkService {
         if (writer.containsKey(nameIndex)) {
             LOG.info("already start task");
         } else {
-            LoadModel loadModel = dorisOptions.getLoadModel();
+            DorisWriter dorisWriter;
             String topic = topicPartition.topic();
             int partition = topicPartition.partition();
-            DorisWriter dorisWriter =
-                    LoadModel.COPY_INTO.equals(loadModel)
-                            ? new CopyIntoWriter(
-                                    topic, partition, dorisOptions, conn, connectMonitor)
-                            : new StreamLoadWriter(
-                                    topic, partition, dorisOptions, conn, connectMonitor);
+            String schemaChangeTopic = dorisOptions.getSchemaTopic();
+            if (Objects.nonNull(schemaChangeTopic) && schemaChangeTopic.equals(topic)) {
+                dorisWriter =
+                        new DebeziumSchemaChange(
+                                topic, partition, dorisOptions, conn, connectMonitor);
+            } else {
+                LoadModel loadModel = dorisOptions.getLoadModel();
+                dorisWriter =
+                        LoadModel.COPY_INTO.equals(loadModel)
+                                ? new CopyIntoWriter(
+                                        topic, partition, dorisOptions, conn, connectMonitor)
+                                : new StreamLoadWriter(
+                                        topic, partition, dorisOptions, conn, connectMonitor);
+            }
             writer.put(nameIndex, dorisWriter);
             metricsJmxReporter.start();
         }
@@ -119,7 +129,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
         // check all sink writer to see if they need to be flushed
         for (DorisWriter writer : writer.values()) {
             // Time based flushing
-            if (writer.shouldFlush()) {
+            if (!(writer instanceof DebeziumSchemaChange) && writer.shouldFlush()) {
                 writer.flushBuffer();
             }
         }
