@@ -124,8 +124,6 @@ public class TestDebeziumSchemaChange {
         Assert.assertEquals(
                 ddlSqlList.get(0),
                 "ALTER TABLE `test_db`.`normal_time` ADD COLUMN `time_test` STRING DEFAULT '12:00'");
-        Assert.assertEquals(
-                ddlSqlList.get(1), "ALTER TABLE `test_db`.`normal_time` DROP COLUMN `date_test`");
     }
 
     @After

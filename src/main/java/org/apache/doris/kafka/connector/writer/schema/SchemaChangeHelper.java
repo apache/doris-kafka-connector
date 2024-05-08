@@ -31,35 +31,35 @@ import org.apache.doris.kafka.connector.model.ColumnDescriptor;
 import org.apache.doris.kafka.connector.model.TableDescriptor;
 
 public class SchemaChangeHelper {
-    private static final List<String> dropFieldSchemas = Lists.newArrayList();
-    private static final List<ColumnDescriptor> addFieldSchemas = Lists.newArrayList();
-    // Used to determine whether the doris table supports ddl
+    private static final List<ColumnDescriptor> addColumnDescriptors = Lists.newArrayList();
+    // Used to determine whether the column in the doris table can undergo schema change
     private static final List<DDLSchema> ddlSchemas = Lists.newArrayList();
     private static final String ADD_DDL = "ALTER TABLE %s ADD COLUMN %s %s";
+
+    // TODO support drop column
+    // Dropping a column is a dangerous behavior and may result in an accidental deletion.
+    // There are some problems in the current implementation: each alter column operation will read
+    // the table structure
+    // in doris and compare the schema with the topic message.
+    // When there are more columns in the doris table than in the upstream table,
+    // these redundant columns in doris will be dropped, regardless of these redundant columns, is
+    // what you need.
+    // Therefore, the operation of dropping a column behavior currently requires the user to do it
+    // himself.
     private static final String DROP_DDL = "ALTER TABLE %s DROP COLUMN %s";
-    // TODO support rename column
-    private static final String RENAME_DDL = "ALTER TABLE %s RENAME COLUMN %s %s";
 
     /**
      * Compare kafka upstream table structure with doris table structure. If kafka field does not
-     * contain the structure of dorisTable, then need to add this field, if dorisTable does not
-     * contain fields in kafka fields, then need to delete them.
+     * contain the structure of dorisTable, then need to add this field.
      *
      * @param dorisTable read from the table schema of doris.
      * @param fields table structure from kafka upstream data source.
      */
     public static void compareSchema(
             TableDescriptor dorisTable, Map<String, RecordDescriptor.FieldDescriptor> fields) {
-        dropFieldSchemas.clear();
-        addFieldSchemas.clear();
-        // Determine whether fields need to be dropped in doris table
-        Collection<ColumnDescriptor> dorisTableColumns = dorisTable.getColumns();
-        for (ColumnDescriptor dorisColumn : dorisTableColumns) {
-            if (!fields.containsKey(dorisColumn.getColumnName())) {
-                dropFieldSchemas.add(dorisColumn.getColumnName());
-            }
-        }
         // Determine whether fields need to be added to doris table
+        addColumnDescriptors.clear();
+        Collection<ColumnDescriptor> dorisTableColumns = dorisTable.getColumns();
         Set<String> dorisTableColumnNames =
                 dorisTableColumns.stream()
                         .map(ColumnDescriptor::getColumnName)
@@ -76,7 +76,7 @@ public class SchemaChangeHelper {
                                 .defaultValue(fieldDescriptor.getDefaultValue())
                                 .comment(fieldDescriptor.getComment())
                                 .build();
-                addFieldSchemas.add(columnDescriptor);
+                addColumnDescriptors.add(columnDescriptor);
             }
         }
     }
@@ -84,13 +84,9 @@ public class SchemaChangeHelper {
     public static List<String> generateDDLSql(String database, String table) {
         ddlSchemas.clear();
         List<String> ddlList = Lists.newArrayList();
-        for (ColumnDescriptor columnDescriptor : addFieldSchemas) {
+        for (ColumnDescriptor columnDescriptor : addColumnDescriptors) {
             ddlList.add(buildAddColumnDDL(database, table, columnDescriptor));
             ddlSchemas.add(new DDLSchema(columnDescriptor.getColumnName(), false));
-        }
-        for (String columName : dropFieldSchemas) {
-            ddlList.add(buildDropColumnDDL(database, table, columName));
-            ddlSchemas.add(new DDLSchema(columName, true));
         }
         return ddlList;
     }
