@@ -44,7 +44,7 @@ public class DorisOptions {
     private final String password;
     private final String database;
     private final Map<String, String> topicMap;
-
+    private final String schemaTopic;
     private final int fileSize;
     private final int recordNum;
     private long flushTime;
@@ -105,6 +105,7 @@ public class DorisOptions {
             this.flushTime = DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC_MIN;
         }
         this.topicMap = getTopicToTableMap(config);
+        this.schemaTopic = config.get(DorisSinkConnectorConfig.SCHEMA_TOPIC);
 
         enableCustomJMX = DorisSinkConnectorConfig.JMX_OPT_DEFAULT;
         if (config.containsKey(DorisSinkConnectorConfig.JMX_OPT)) {
@@ -194,6 +195,10 @@ public class DorisOptions {
 
     public String getTopicMapTable(String topic) {
         return topicMap.get(topic);
+    }
+
+    public Map<String, String> getTopicMap() {
+        return topicMap;
     }
 
     public String getQueryUrl() {
@@ -286,6 +291,10 @@ public class DorisOptions {
 
     public boolean isEnableDelete() {
         return enableDelete;
+    }
+
+    public String getSchemaTopic() {
+        return schemaTopic;
     }
 
     /**

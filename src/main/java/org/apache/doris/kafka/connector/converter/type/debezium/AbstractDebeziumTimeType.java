@@ -32,7 +32,7 @@ public abstract class AbstractDebeziumTimeType extends AbstractTimeType {
         }
         if (sourceValue instanceof Number) {
             final LocalTime localTime = getLocalTime((Number) sourceValue);
-            return String.format("'%s'", DateTimeFormatter.ISO_TIME.format(localTime));
+            return String.format("%s", DateTimeFormatter.ISO_TIME.format(localTime));
         }
         throw new ConnectException(
                 String.format(

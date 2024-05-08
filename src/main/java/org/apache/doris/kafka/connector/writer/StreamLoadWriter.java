@@ -39,6 +39,7 @@ import org.apache.doris.kafka.connector.utils.FileNameUtils;
 import org.apache.doris.kafka.connector.writer.commit.DorisCommittable;
 import org.apache.doris.kafka.connector.writer.commit.DorisCommitter;
 import org.apache.doris.kafka.connector.writer.load.DorisStreamLoad;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,6 +138,12 @@ public class StreamLoadWriter extends DorisWriter {
                     e);
         }
         return label2Status;
+    }
+
+    @Override
+    public void insert(SinkRecord record) {
+        initRecord(record);
+        insertRecord(record);
     }
 
     @Override

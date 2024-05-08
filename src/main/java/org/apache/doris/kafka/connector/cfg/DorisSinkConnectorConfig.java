@@ -78,6 +78,7 @@ public class DorisSinkConnectorConfig {
     public static final String DELIVERY_GUARANTEE_DEFAULT = DeliveryGuarantee.AT_LEAST_ONCE.name();
     public static final String CONVERT_MODE = "converter.mode";
     public static final String CONVERT_MODE_DEFAULT = ConverterMode.NORMAL.getName();
+    public static final String SCHEMA_TOPIC = "schema.topic";
     // Prefix for Doris StreamLoad specific properties.
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
 
