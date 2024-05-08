@@ -18,8 +18,8 @@
  */
 package org.apache.doris.kafka.connector.converter.type.debezium;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import org.apache.doris.kafka.connector.converter.type.AbstractTimeType;
 import org.apache.kafka.connect.errors.ConnectException;
 
@@ -32,7 +32,7 @@ public abstract class AbstractDebeziumTimeType extends AbstractTimeType {
         }
         if (sourceValue instanceof Number) {
             final LocalTime localTime = getLocalTime((Number) sourceValue);
-            return localTime.atDate(LocalDate.now());
+            return String.format("'%s'", DateTimeFormatter.ISO_TIME.format(localTime));
         }
         throw new ConnectException(
                 String.format(
