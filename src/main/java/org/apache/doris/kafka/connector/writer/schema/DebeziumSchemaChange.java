@@ -19,6 +19,7 @@
 
 package org.apache.doris.kafka.connector.writer.schema;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.debezium.data.Envelope;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,10 +45,11 @@ import org.slf4j.LoggerFactory;
 
 public class DebeziumSchemaChange extends DorisWriter {
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumSchemaChange.class);
-    private final Set<String> sinkTableSet;
-    private final DorisSystemService dorisSystemService;
     private final Map<String, String> topic2TableMap;
-    private final SchemaChangeManager schemaChangeManager;
+    private SchemaChangeManager schemaChangeManager;
+    private DorisSystemService dorisSystemService;
+    private Set<String> sinkTableSet;
+    private List<String> ddlSqlList;
 
     public DebeziumSchemaChange(
             String topic,
@@ -137,9 +139,8 @@ public class DebeziumSchemaChange extends DorisWriter {
         }
         final TableDescriptor dorisTableDescriptor = obtainTableSchema(tableName);
         SchemaChangeHelper.compareSchema(dorisTableDescriptor, record.getFields());
-        List<String> ddlSql =
-                SchemaChangeHelper.generateDDLSql(dorisOptions.getDatabase(), tableName);
-        doSchemaChange(dorisOptions.getDatabase(), tableName, ddlSql);
+        ddlSqlList = SchemaChangeHelper.generateDDLSql(dorisOptions.getDatabase(), tableName);
+        doSchemaChange(dorisOptions.getDatabase(), tableName);
     }
 
     /** Obtain table schema from doris. */
@@ -188,17 +189,17 @@ public class DebeziumSchemaChange extends DorisWriter {
         processedOffset.set(recordDescriptor.getOffset());
     }
 
-    private boolean doSchemaChange(String database, String tableName, List<String> ddlList) {
+    private boolean doSchemaChange(String database, String tableName) {
         boolean status = false;
-        if (ddlList.isEmpty()) {
+        if (ddlSqlList.isEmpty()) {
             LOG.info("Schema change ddl is empty, not need do schema change.");
             return false;
         }
         try {
             List<SchemaChangeHelper.DDLSchema> ddlSchemas = SchemaChangeHelper.getDdlSchemas();
-            for (int i = 0; i < ddlList.size(); i++) {
+            for (int i = 0; i < ddlSqlList.size(); i++) {
                 SchemaChangeHelper.DDLSchema ddlSchema = ddlSchemas.get(i);
-                String ddlSql = ddlList.get(i);
+                String ddlSql = ddlSqlList.get(i);
                 boolean doSchemaChange = checkSchemaChange(database, tableName, ddlSchema);
                 status =
                         doSchemaChange
@@ -227,5 +228,25 @@ public class DebeziumSchemaChange extends DorisWriter {
 
     private boolean isTombstone(SinkRecord record) {
         return record.value() == null;
+    }
+
+    @VisibleForTesting
+    public void setSinkTableSet(Set<String> sinkTableSet) {
+        this.sinkTableSet = sinkTableSet;
+    }
+
+    @VisibleForTesting
+    public void setDorisSystemService(DorisSystemService dorisSystemService) {
+        this.dorisSystemService = dorisSystemService;
+    }
+
+    @VisibleForTesting
+    public List<String> getDdlSqlList() {
+        return ddlSqlList;
+    }
+
+    @VisibleForTesting
+    public void setSchemaChangeManager(SchemaChangeManager schemaChangeManager) {
+        this.schemaChangeManager = schemaChangeManager;
     }
 }
