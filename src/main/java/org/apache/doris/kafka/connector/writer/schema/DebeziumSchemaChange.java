@@ -21,6 +21,7 @@ package org.apache.doris.kafka.connector.writer.schema;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.debezium.data.Envelope;
+import io.debezium.util.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,6 +46,9 @@ import org.slf4j.LoggerFactory;
 
 public class DebeziumSchemaChange extends DorisWriter {
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumSchemaChange.class);
+    public static final String SCHEMA_CHANGE_VALUE = "SchemaChangeValue";
+    public static final String TABLE_CHANGES = "tableChanges";
+    public static final String TABLE_CHANGES_TYPE = "type";
     private final Map<String, String> topic2TableMap;
     private SchemaChangeManager schemaChangeManager;
     private DorisSystemService dorisSystemService;
@@ -80,7 +84,56 @@ public class DebeziumSchemaChange extends DorisWriter {
 
     @Override
     public void insert(SinkRecord record) {
+        if (!validate(record)) {
+            processedOffset.set(record.kafkaOffset());
+            return;
+        }
         schemaChange(record);
+    }
+
+    private boolean validate(final SinkRecord record) {
+        if (!isSchemaChange(record)) {
+            LOG.warn(
+                    "Current topic={}, the message does not contain schema change change information, please check schema.topic",
+                    dorisOptions.getSchemaTopic());
+            throw new SchemaChangeException(
+                    "The message does not contain schema change change information, please check schema.topic");
+        }
+
+        tableName = resolveTableName(record);
+        if (tableName == null) {
+            LOG.warn(
+                    "Ignored to write record from topic '{}' partition '{}' offset '{}'. No resolvable table name",
+                    record.topic(),
+                    record.kafkaPartition(),
+                    record.kafkaOffset());
+            return false;
+        }
+
+        if (!sinkTableSet.contains(tableName)) {
+            LOG.warn(
+                    "The "
+                            + tableName
+                            + " is not defined and requires synchronized data. If you need to synchronize the table data, please configure it in 'doris.topic2table.map'");
+            return false;
+        }
+
+        Struct recordStruct = (Struct) (record.value());
+        if (isTruncate(recordStruct)) {
+            LOG.warn("Truncate {} table is not supported", tableName);
+            return false;
+        }
+
+        List<Object> tableChanges = recordStruct.getArray(TABLE_CHANGES);
+        Struct tableChange = (Struct) tableChanges.get(0);
+        if ("DROP".equalsIgnoreCase(tableChange.getString(TABLE_CHANGES_TYPE))
+                || "CREATE".equalsIgnoreCase(tableChange.getString(TABLE_CHANGES_TYPE))) {
+            LOG.warn(
+                    "CREATE and DROP {} tables are currently not supported. Please create or drop them manually.",
+                    tableName);
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -89,33 +142,26 @@ public class DebeziumSchemaChange extends DorisWriter {
     }
 
     private void schemaChange(final SinkRecord record) {
-        String tableName = resolveTableName(record);
-        if (tableName == null) {
-            LOG.warn(
-                    "Ignored to write record from topic '{}' partition '{}' offset '{}'. No resolvable table name",
-                    record.topic(),
-                    record.kafkaPartition(),
-                    record.kafkaOffset());
-            processedOffset.set(record.kafkaOffset());
-            return;
-        }
         Struct recordStruct = (Struct) (record.value());
-        List<Object> tableChanges = recordStruct.getArray("tableChanges");
+        List<Object> tableChanges = recordStruct.getArray(TABLE_CHANGES);
         Struct tableChange = (Struct) tableChanges.get(0);
-        if ("DROP".equalsIgnoreCase(tableChange.getString("type"))
-                || "CREATE".equalsIgnoreCase(tableChange.getString("type"))) {
-            LOG.warn(
-                    "CREATE and DROP {} tables are currently not supported. Please create or drop them manually.",
-                    tableName);
-            processedOffset.set(record.kafkaOffset());
-            return;
-        }
         RecordDescriptor recordDescriptor =
                 RecordDescriptor.builder()
                         .withSinkRecord(record)
                         .withTableChange(tableChange)
                         .build();
         tableChange(tableName, recordDescriptor);
+    }
+
+    private boolean isTruncate(final Struct record) {
+        // Generally the truncate corresponding tableChanges is empty
+        return record.getArray(TABLE_CHANGES).isEmpty();
+    }
+
+    private static boolean isSchemaChange(SinkRecord record) {
+        return record.valueSchema() != null
+                && !Strings.isNullOrEmpty(record.valueSchema().name())
+                && record.valueSchema().name().contains(SCHEMA_CHANGE_VALUE);
     }
 
     private String resolveTableName(SinkRecord record) {
@@ -170,15 +216,6 @@ public class DebeziumSchemaChange extends DorisWriter {
     }
 
     private void tableChange(String tableName, RecordDescriptor recordDescriptor) {
-        if (!sinkTableSet.contains(tableName)) {
-            processedOffset.set(recordDescriptor.getOffset());
-            LOG.warn(
-                    "The "
-                            + tableName
-                            + " is not defined and requires synchronized data. If you need to synchronize the table data, please configure it in 'doris.topic2table.map'");
-            return;
-        }
-
         if (!hasTable(tableName)) {
             // TODO Table does not exist, automatically created it.
             LOG.error("{} Table does not exist, please create manually.", tableName);
@@ -223,7 +260,7 @@ public class DebeziumSchemaChange extends DorisWriter {
 
     public long getOffset() {
         committedOffset.set(processedOffset.get());
-        return committedOffset.get();
+        return committedOffset.get() + 1;
     }
 
     private boolean isTombstone(SinkRecord record) {
