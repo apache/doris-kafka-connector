@@ -19,13 +19,9 @@
 
 package org.apache.doris.kafka.connector.utils;
 
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.exception.ArgumentsException;
 import org.apache.doris.kafka.connector.exception.DorisException;
@@ -75,31 +71,6 @@ public class ConfigCheckUtils {
                     DorisSinkConnectorConfig.TOPICS,
                     DorisSinkConnectorConfig.TOPICS_REGEX);
             configIsValid = false;
-        }
-
-        String schemaTopic = config.get(DorisSinkConnectorConfig.SCHEMA_TOPIC);
-        if (StringUtils.isNotEmpty(schemaTopic)) {
-            schemaTopic = schemaTopic.trim();
-            if (!topics.isEmpty()) {
-                List<String> topicList =
-                        Arrays.stream(topics.split(",")).collect(Collectors.toList());
-                if (!topicList.contains(schemaTopic)) {
-                    LOG.error(
-                            "schema.topic is not included in topics list, please add! "
-                                    + " schema.topic={}, topics={}",
-                            schemaTopic,
-                            topics);
-                    configIsValid = false;
-                }
-            }
-            if (!topicsRegex.isEmpty() && !topicsRegex.equals(schemaTopic)) {
-                LOG.error(
-                        "topics.regex must equals schema.topic. please check again!"
-                                + " topics.regex={}, schema.topic={}",
-                        topicsRegex,
-                        schemaTopic);
-                configIsValid = false;
-            }
         }
 
         if (config.containsKey(DorisSinkConnectorConfig.TOPICS_TABLES_MAP)

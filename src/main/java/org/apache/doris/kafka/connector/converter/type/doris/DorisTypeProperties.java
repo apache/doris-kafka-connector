@@ -17,12 +17,16 @@
  * under the License.
  */
 
-package org.apache.doris.kafka.connector.dialect;
+package org.apache.doris.kafka.connector.converter.type.doris;
 
-public class DialectProperties {
+public class DorisTypeProperties {
 
     /* Max precision of datetime type of Doris. */
     public static final int MAX_SUPPORTED_DATE_TIME_PRECISION = 6;
 
     public static final int TIMESTAMP_TYPE_MAX_PRECISION = 9;
+
+    public static final int MAX_VARCHAR_SIZE = 65533;
+
+    public static final int MAX_CHAR_SIZE = 255;
 }

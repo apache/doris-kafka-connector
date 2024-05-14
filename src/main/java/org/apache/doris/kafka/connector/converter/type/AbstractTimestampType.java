@@ -18,5 +18,26 @@
  */
 package org.apache.doris.kafka.connector.converter.type;
 
+import java.util.Optional;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisTypeProperties;
+import org.apache.kafka.connect.data.Schema;
+
 /** An abstract temporal implementation of {@link Type} for {@code TIMESTAMP} based columns. */
-public abstract class AbstractTimestampType extends AbstractTemporalType {}
+public abstract class AbstractTimestampType extends AbstractTemporalType {
+
+    @Override
+    public String getTypeName(Schema schema) {
+        final int precision = getTimePrecision(schema);
+        return String.format(
+                "%s(%s)",
+                DorisType.DATETIME,
+                Math.min(precision, DorisTypeProperties.MAX_SUPPORTED_DATE_TIME_PRECISION));
+    }
+
+    protected int getTimePrecision(Schema schema) {
+        final String length = getSourceColumnLength(schema).orElse("0");
+        final Optional<String> scale = getSourceColumnPrecision(schema);
+        return scale.map(Integer::parseInt).orElseGet(() -> Integer.parseInt(length));
+    }
+}

@@ -18,6 +18,9 @@
  */
 package org.apache.doris.kafka.connector.converter.type.connect;
 
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
+
 public class ConnectInt32Type extends AbstractConnectSchemaType {
 
     public static final ConnectInt32Type INSTANCE = new ConnectInt32Type();
@@ -25,6 +28,11 @@ public class ConnectInt32Type extends AbstractConnectSchemaType {
     @Override
     public String[] getRegistrationKeys() {
         return new String[] {"INT32"};
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return DorisType.INT;
     }
 
     @Override

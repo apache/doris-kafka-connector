@@ -18,6 +18,9 @@
  */
 package org.apache.doris.kafka.connector.converter.type.connect;
 
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
+
 public class ConnectInt16Type extends AbstractConnectSchemaType {
 
     public static final ConnectInt16Type INSTANCE = new ConnectInt16Type();
@@ -25,6 +28,11 @@ public class ConnectInt16Type extends AbstractConnectSchemaType {
     @Override
     public String[] getRegistrationKeys() {
         return new String[] {"INT16"};
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return DorisType.SMALLINT;
     }
 
     @Override

@@ -18,7 +18,11 @@
  */
 package org.apache.doris.kafka.connector.converter.type;
 
+import java.util.Objects;
+import java.util.Optional;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.converter.utils.SchemaUtils;
+import org.apache.kafka.connect.data.Schema;
 
 /** An abstract implementation of {@link Type}, which all types should extend. */
 public abstract class AbstractType implements Type {
@@ -39,5 +43,24 @@ public abstract class AbstractType implements Type {
     @Override
     public String toString() {
         return getClass().getSimpleName();
+    }
+
+    protected Optional<String> getSchemaParameter(Schema schema, String parameterName) {
+        if (!Objects.isNull(schema.parameters())) {
+            return Optional.ofNullable(schema.parameters().get(parameterName));
+        }
+        return Optional.empty();
+    }
+
+    protected Optional<String> getSourceColumnType(Schema schema) {
+        return SchemaUtils.getSourceColumnType(schema);
+    }
+
+    protected Optional<String> getSourceColumnLength(Schema schema) {
+        return SchemaUtils.getSourceColumnLength(schema);
+    }
+
+    protected Optional<String> getSourceColumnPrecision(Schema schema) {
+        return SchemaUtils.getSourceColumnPrecision(schema);
     }
 }

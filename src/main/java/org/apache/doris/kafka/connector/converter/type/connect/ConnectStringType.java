@@ -18,6 +18,10 @@
  */
 package org.apache.doris.kafka.connector.converter.type.connect;
 
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisTypeProperties;
+import org.apache.kafka.connect.data.Schema;
+
 /**
  * An implementation of {@link org.apache.doris.kafka.connector.converter.type.Type} that supports
  * {@code STRING} connect schema types.
@@ -27,7 +31,22 @@ public class ConnectStringType extends AbstractConnectSchemaType {
     public static final ConnectStringType INSTANCE = new ConnectStringType();
 
     @Override
+    public String getTypeName(Schema schema) {
+        int columnLength = getColumnLength(schema);
+        if (columnLength > 0) {
+            return columnLength * 3 > DorisTypeProperties.MAX_VARCHAR_SIZE
+                    ? DorisType.STRING
+                    : String.format("%s(%s)", DorisType.VARCHAR, columnLength * 3);
+        }
+        return DorisType.STRING;
+    }
+
+    @Override
     public String[] getRegistrationKeys() {
         return new String[] {"STRING"};
+    }
+
+    private int getColumnLength(Schema schema) {
+        return Integer.parseInt(getSourceColumnLength(schema).orElse("0"));
     }
 }

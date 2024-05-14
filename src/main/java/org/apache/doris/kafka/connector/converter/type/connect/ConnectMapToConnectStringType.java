@@ -19,11 +19,17 @@
 package org.apache.doris.kafka.connector.converter.type.connect;
 
 import java.util.Map;
+import org.apache.kafka.connect.data.Schema;
 
 public class ConnectMapToConnectStringType extends AbstractConnectMapType {
 
     public static final ConnectMapToConnectStringType INSTANCE =
             new ConnectMapToConnectStringType();
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return ConnectStringType.INSTANCE.getTypeName(schema);
+    }
 
     @Override
     public Object getValue(Object sourceValue) {

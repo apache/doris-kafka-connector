@@ -19,6 +19,13 @@
 
 package org.apache.doris.kafka.connector.converter;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -30,20 +37,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.converter.schema.SchemaChangeManager;
+import org.apache.doris.kafka.connector.exception.DorisException;
+import org.apache.doris.kafka.connector.model.doris.Schema;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
+import org.apache.doris.kafka.connector.service.RestService;
 import org.apache.doris.kafka.connector.writer.TestRecordBuffer;
 import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestRecordService {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private RecordService recordService;
     private Properties props = new Properties();
     private JsonConverter jsonConverter = new JsonConverter();
+    private MockedStatic<RestService> mockRestService;
 
     @Before
     public void init() throws IOException {
@@ -54,9 +72,21 @@ public class TestRecordService {
         props.load(stream);
         props.put("task_id", "1");
         props.put("converter.mode", "debezium_ingestion");
+        props.put("schema.evolution", "basic");
+        props.put(
+                "doris.topic2table.map",
+                "avro_schema.wdl_test.example_table:example_table,normal.wdl_test.test_sink_normal:test_sink_normal");
         recordService = new RecordService(new DorisOptions((Map) props));
         HashMap<String, String> config = new HashMap<>();
         jsonConverter.configure(config, false);
+        mockRestService = mockStatic(RestService.class);
+
+        SchemaChangeManager mockSchemaChangeManager = Mockito.mock(SchemaChangeManager.class);
+        DorisSystemService mockDorisSystemService = mock(DorisSystemService.class);
+        doNothing().when(mockSchemaChangeManager).addColumnDDL(anyString(), any());
+        when(mockDorisSystemService.tableExists(anyString(), anyString())).thenReturn(true);
+        recordService.setDorisSystemService(mockDorisSystemService);
+        recordService.setSchemaChangeManager(mockSchemaChangeManager);
     }
 
     /**
@@ -70,7 +100,19 @@ public class TestRecordService {
      */
     @Test
     public void processMysqlDebeziumStructRecord() throws IOException {
-        String topic = "normal.wdl_test.example_table";
+        String schemaStr =
+                "{\"keysType\":\"UNIQUE_KEYS\",\"properties\":[{\"name\":\"id\",\"aggregation_type\":\"\",\"comment\":\"\",\"type\":\"BIGINT\"},{\"name\":\"name\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"age\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"INT\"},{\"name\":\"email\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"birth_date\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATEV2\"},{\"name\":\"integer_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"INT\"},{\"name\":\"float_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"FLOAT\"},{\"name\":\"decimal_column\",\"aggregation_type\":\"NONE\",\"scale\":\"2\",\"comment\":\"\",\"type\":\"DECIMAL64\",\"precision\":\"10\"},{\"name\":\"datetime_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATETIMEV2\"},{\"name\":\"date_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATEV2\"},{\"name\":\"text_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"binary_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"is_active\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"BOOLEAN\"},{\"name\":\"varchar_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"blob_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"STRING\"},{\"name\":\"time_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"STRING\"}],\"status\":200}";
+        Schema schema = null;
+        try {
+            schema = objectMapper.readValue(schemaStr, Schema.class);
+        } catch (JsonProcessingException e) {
+            throw new DorisException(e);
+        }
+        mockRestService
+                .when(() -> RestService.getSchema(any(), any(), any(), any()))
+                .thenReturn(schema);
+
+        String topic = "avro_schema.wdl_test.example_table";
         // no delete value
         String noDeleteValue =
                 "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"},{\"type\":\"string\",\"optional\":true,\"field\":\"email\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"birth_date\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"integer_column\"},{\"type\":\"float\",\"optional\":true,\"field\":\"float_column\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"2\",\"connect.decimal.precision\":\"10\"},\"field\":\"decimal_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"datetime_column\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"date_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"time_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"text_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"varchar_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"binary_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"blob_column\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"is_active\"}],\"optional\":true,\"name\":\"normal.wdl_test.example_table.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"},{\"type\":\"string\",\"optional\":true,\"field\":\"email\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"birth_date\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"integer_column\"},{\"type\":\"float\",\"optional\":true,\"field\":\"float_column\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"2\",\"connect.decimal.precision\":\"10\"},\"field\":\"decimal_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"datetime_column\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"date_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"time_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"text_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"varchar_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"binary_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"blob_column\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"is_active\"}],\"optional\":true,\"name\":\"normal.wdl_test.example_table.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.data.Enum\",\"version\":1,\"parameters\":{\"allowed\":\"true,last,false,incremental\"},\"default\":\"false\",\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"sequence\"},{\"type\":\"string\",\"optional\":true,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"server_id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"gtid\"},{\"type\":\"string\",\"optional\":false,\"field\":\"file\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"pos\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"row\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"thread\"},{\"type\":\"string\",\"optional\":true,\"field\":\"query\"}],\"optional\":false,\"name\":\"io.debezium.connector.mysql.Source\",\"field\":\"source\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"id\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"total_order\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"data_collection_order\"}],\"optional\":true,\"name\":\"event.block\",\"version\":1,\"field\":\"transaction\"}],\"optional\":false,\"name\":\"normal.wdl_test.example_table.Envelope\",\"version\":1},\"payload\":{\"before\":null,\"after\":{\"id\":8,\"name\":\"Jfohn Doe\",\"age\":430,\"email\":\"john@example.com\",\"birth_date\":8905,\"integer_column\":12323,\"float_column\":45.67,\"decimal_column\":\"MDk=\",\"datetime_column\":1712917800000,\"date_column\":19825,\"time_column\":37800000000,\"text_column\":\"Lorem ipsum dolor sit amet, consectetur adipiscing elit.\",\"varchar_column\":null,\"binary_column\":\"EjRWeJCrze8AAA==\",\"blob_column\":null,\"is_active\":2},\"source\":{\"version\":\"2.5.4.Final\",\"connector\":\"mysql\",\"name\":\"normal\",\"ts_ms\":1712915126000,\"snapshot\":\"false\",\"db\":\"wdl_test\",\"sequence\":null,\"table\":\"example_table\",\"server_id\":1,\"gtid\":null,\"file\":\"binlog.000063\",\"pos\":13454,\"row\":0,\"thread\":20,\"query\":null},\"op\":\"c\",\"ts_ms\":1712915126481,\"transaction\":null}}";
@@ -86,13 +128,48 @@ public class TestRecordService {
         buildProcessStructRecord(topic, deleteValue, expectedDeleteValue);
     }
 
+    @Test
+    public void processMysqlDebeziumStructRecordAlter() throws IOException {
+        String schemaStr =
+                "{\"keysType\":\"UNIQUE_KEYS\",\"properties\":[{\"name\":\"id\",\"aggregation_type\":\"\",\"comment\":\"\",\"type\":\"BIGINT\"},{\"name\":\"name\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"age\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"INT\"},{\"name\":\"email\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"birth_date\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATEV2\"},{\"name\":\"integer_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"INT\"},{\"name\":\"float_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"FLOAT\"},{\"name\":\"decimal_column\",\"aggregation_type\":\"NONE\",\"scale\":\"2\",\"comment\":\"\",\"type\":\"DECIMAL64\",\"precision\":\"10\"},{\"name\":\"datetime_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATETIMEV2\"},{\"name\":\"date_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATEV2\"},{\"name\":\"text_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"binary_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"is_active\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"BOOLEAN\"},{\"name\":\"varchar_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"}],\"status\":200}";
+        Schema schema = null;
+        try {
+            schema = objectMapper.readValue(schemaStr, Schema.class);
+        } catch (JsonProcessingException e) {
+            throw new DorisException(e);
+        }
+        mockRestService
+                .when(() -> RestService.getSchema(any(), any(), any(), any()))
+                .thenReturn(schema);
+
+        String topic = "avro_schema.wdl_test.example_table";
+        String topicMsg =
+                "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"},{\"type\":\"string\",\"optional\":true,\"field\":\"email\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"birth_date\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"integer_column\"},{\"type\":\"float\",\"optional\":true,\"field\":\"float_column\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"2\",\"connect.decimal.precision\":\"10\"},\"field\":\"decimal_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"datetime_column\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"date_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"time_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"text_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"varchar_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"binary_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"blob_column\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"is_active\"}],\"optional\":true,\"name\":\"normal.wdl_test.example_table.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"},{\"type\":\"string\",\"optional\":true,\"field\":\"email\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"birth_date\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"integer_column\"},{\"type\":\"float\",\"optional\":true,\"field\":\"float_column\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"2\",\"connect.decimal.precision\":\"10\"},\"field\":\"decimal_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"datetime_column\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"date_column\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"time_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"text_column\"},{\"type\":\"string\",\"optional\":true,\"field\":\"varchar_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"binary_column\"},{\"type\":\"bytes\",\"optional\":true,\"field\":\"blob_column\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"is_active\"}],\"optional\":true,\"name\":\"normal.wdl_test.example_table.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.data.Enum\",\"version\":1,\"parameters\":{\"allowed\":\"true,last,false,incremental\"},\"default\":\"false\",\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"sequence\"},{\"type\":\"string\",\"optional\":true,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"server_id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"gtid\"},{\"type\":\"string\",\"optional\":false,\"field\":\"file\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"pos\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"row\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"thread\"},{\"type\":\"string\",\"optional\":true,\"field\":\"query\"}],\"optional\":false,\"name\":\"io.debezium.connector.mysql.Source\",\"field\":\"source\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"id\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"total_order\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"data_collection_order\"}],\"optional\":true,\"name\":\"event.block\",\"version\":1,\"field\":\"transaction\"}],\"optional\":false,\"name\":\"normal.wdl_test.example_table.Envelope\",\"version\":1},\"payload\":{\"before\":null,\"after\":{\"id\":8,\"name\":\"Jfohn Doe\",\"age\":430,\"email\":\"john@example.com\",\"birth_date\":8905,\"integer_column\":12323,\"float_column\":45.67,\"decimal_column\":\"MDk=\",\"datetime_column\":1712917800000,\"date_column\":19825,\"time_column\":37800000000,\"text_column\":\"Lorem ipsum dolor sit amet, consectetur adipiscing elit.\",\"varchar_column\":null,\"binary_column\":\"EjRWeJCrze8AAA==\",\"blob_column\":null,\"is_active\":2},\"source\":{\"version\":\"2.5.4.Final\",\"connector\":\"mysql\",\"name\":\"normal\",\"ts_ms\":1712915126000,\"snapshot\":\"false\",\"db\":\"wdl_test\",\"sequence\":null,\"table\":\"example_table\",\"server_id\":1,\"gtid\":null,\"file\":\"binlog.000063\",\"pos\":13454,\"row\":0,\"thread\":20,\"query\":null},\"op\":\"c\",\"ts_ms\":1712915126481,\"transaction\":null}}";
+        SchemaAndValue schemaValue =
+                jsonConverter.toConnectData(topic, topicMsg.getBytes(StandardCharsets.UTF_8));
+        SinkRecord noDeleteSinkRecord =
+                TestRecordBuffer.newSinkRecord(topic, schemaValue.value(), 8, schemaValue.schema());
+        recordService.processStructRecord(noDeleteSinkRecord);
+
+        // Compare the results of schema change
+        Map<String, String> resultFields = new HashMap<>();
+        resultFields.put("time_column", "DATETIME(0)");
+        resultFields.put("blob_column", "STRING");
+        Set<RecordDescriptor.FieldDescriptor> missingFields = recordService.getMissingFields();
+        for (RecordDescriptor.FieldDescriptor missingField : missingFields) {
+            Assert.assertTrue(resultFields.containsKey(missingField.getName()));
+            Assert.assertEquals(
+                    resultFields.get(missingField.getName()), missingField.getTypeName());
+        }
+    }
+
     private void buildProcessStructRecord(String topic, String sourceValue, String target)
             throws IOException {
         SchemaAndValue noDeleteSchemaValue =
                 jsonConverter.toConnectData(topic, sourceValue.getBytes(StandardCharsets.UTF_8));
         SinkRecord noDeleteSinkRecord =
                 TestRecordBuffer.newSinkRecord(
-                        noDeleteSchemaValue.value(), 8, noDeleteSchemaValue.schema());
+                        topic, noDeleteSchemaValue.value(), 8, noDeleteSchemaValue.schema());
         String processResult = recordService.processStructRecord(noDeleteSinkRecord);
         Assert.assertEquals(target, processResult);
     }
@@ -113,6 +190,18 @@ public class TestRecordService {
 
     @Test
     public void processStructRecordWithDebeziumSchema() throws IOException {
+        String schemaStr =
+                "{\"keysType\":\"UNIQUE_KEYS\",\"properties\":[{\"name\":\"id\",\"aggregation_type\":\"\",\"comment\":\"\",\"type\":\"INT\"},{\"name\":\"name\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"}],\"status\":200}";
+        Schema schema = null;
+        try {
+            schema = objectMapper.readValue(schemaStr, Schema.class);
+        } catch (JsonProcessingException e) {
+            throw new DorisException(e);
+        }
+        mockRestService
+                .when(() -> RestService.getSchema(any(), any(), any(), any()))
+                .thenReturn(schema);
+
         String topic = "normal.wdl_test.test_sink_normal";
 
         // no delete value
@@ -170,5 +259,11 @@ public class TestRecordService {
         SinkRecord record = TestRecordBuffer.newSinkRecord("doris", 1);
         String s = recordService.processStringRecord(record);
         Assert.assertEquals("doris", s);
+    }
+
+    @After
+    public void close() {
+        mockRestService.close();
+        ;
     }
 }

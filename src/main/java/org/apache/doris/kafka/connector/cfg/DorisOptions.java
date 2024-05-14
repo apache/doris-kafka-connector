@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.doris.kafka.connector.converter.ConverterMode;
+import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
@@ -44,7 +45,6 @@ public class DorisOptions {
     private final String password;
     private final String database;
     private final Map<String, String> topicMap;
-    private final String schemaTopic;
     private final int fileSize;
     private final int recordNum;
     private long flushTime;
@@ -62,6 +62,7 @@ public class DorisOptions {
     private LoadModel loadModel;
     private DeliveryGuarantee deliveryGuarantee;
     private ConverterMode converterMode;
+    private SchemaEvolutionMode schemaEvolutionMode;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -91,6 +92,11 @@ public class DorisOptions {
                         config.getOrDefault(
                                 DorisSinkConnectorConfig.CONVERT_MODE,
                                 DorisSinkConnectorConfig.CONVERT_MODE_DEFAULT));
+        this.schemaEvolutionMode =
+                SchemaEvolutionMode.of(
+                        config.getOrDefault(
+                                DorisSinkConnectorConfig.SCHEMA_EVOLUTION,
+                                DorisSinkConnectorConfig.SCHEMA_EVOLUTION_DEFAULT));
 
         this.fileSize = Integer.parseInt(config.get(DorisSinkConnectorConfig.BUFFER_SIZE_BYTES));
         this.recordNum =
@@ -105,7 +111,6 @@ public class DorisOptions {
             this.flushTime = DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC_MIN;
         }
         this.topicMap = getTopicToTableMap(config);
-        this.schemaTopic = config.get(DorisSinkConnectorConfig.SCHEMA_TOPIC);
 
         enableCustomJMX = DorisSinkConnectorConfig.JMX_OPT_DEFAULT;
         if (config.containsKey(DorisSinkConnectorConfig.JMX_OPT)) {
@@ -281,6 +286,10 @@ public class DorisOptions {
         return this.converterMode;
     }
 
+    public SchemaEvolutionMode getSchemaEvolutionMode() {
+        return this.schemaEvolutionMode;
+    }
+
     public boolean isAutoRedirect() {
         return autoRedirect;
     }
@@ -291,10 +300,6 @@ public class DorisOptions {
 
     public boolean isEnableDelete() {
         return enableDelete;
-    }
-
-    public String getSchemaTopic() {
-        return schemaTopic;
     }
 
     /**

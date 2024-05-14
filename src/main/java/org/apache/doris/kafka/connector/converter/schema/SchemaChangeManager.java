@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.doris.kafka.connector.writer.schema;
+package org.apache.doris.kafka.connector.converter.schema;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -28,8 +28,8 @@ import java.util.Map;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.converter.RecordDescriptor;
 import org.apache.doris.kafka.connector.exception.SchemaChangeException;
-import org.apache.doris.kafka.connector.utils.HttpGetWithEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -44,37 +44,13 @@ import org.slf4j.LoggerFactory;
 public class SchemaChangeManager implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(SchemaChangeManager.class);
-    private static final String CHECK_SCHEMA_CHANGE_API =
-            "http://%s/api/enable_light_schema_change/%s/%s";
+    private static final String ADD_DDL = "ALTER TABLE %s ADD COLUMN %s %s";
     private static final String SCHEMA_CHANGE_API = "http://%s/api/query/default_cluster/%s";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final DorisOptions dorisOptions;
 
     public SchemaChangeManager(DorisOptions dorisOptions) {
         this.dorisOptions = dorisOptions;
-    }
-
-    public static Map<String, Object> buildRequestParam(boolean dropColumn, String columnName) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("isDropColumn", dropColumn);
-        params.put("columnName", columnName);
-        return params;
-    }
-
-    /** check ddl can do light schema change. */
-    public boolean checkSchemaChange(String database, String table, Map<String, Object> params)
-            throws IllegalArgumentException, IOException {
-        if (params.isEmpty()) {
-            return false;
-        }
-        String requestUrl =
-                String.format(CHECK_SCHEMA_CHANGE_API, dorisOptions.getHttpUrl(), database, table);
-        HttpGetWithEntity httpGet = new HttpGetWithEntity(requestUrl);
-        httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
-        httpGet.setEntity(new StringEntity(objectMapper.writeValueAsString(params)));
-        String responseEntity = "";
-        Map<String, Object> responseMap = handleResponse(httpGet, responseEntity);
-        return handleSchemaChange(responseMap, responseEntity);
     }
 
     private boolean handleSchemaChange(Map<String, Object> responseMap, String responseEntity) {
@@ -84,6 +60,60 @@ public class SchemaChangeManager implements Serializable {
         } else {
             throw new SchemaChangeException("Failed to schemaChange, response: " + responseEntity);
         }
+    }
+
+    public void addColumnDDL(String tableName, RecordDescriptor.FieldDescriptor field) {
+        try {
+            String addColumnDDL = buildAddColumnDDL(dorisOptions.getDatabase(), tableName, field);
+            boolean status = execute(addColumnDDL, dorisOptions.getDatabase());
+            LOG.info(
+                    "Add missing column for {} table, ddl={}, status={}",
+                    tableName,
+                    addColumnDDL,
+                    status);
+        } catch (Exception e) {
+            LOG.warn("Failed to add column for {}, cause by: ", tableName, e);
+            throw new SchemaChangeException(
+                    "Failed to add column for " + tableName + ", cause by:", e);
+        }
+    }
+
+    public static String buildAddColumnDDL(
+            String database, String tableName, RecordDescriptor.FieldDescriptor field) {
+        String name = field.getName();
+        String typeName = field.getTypeName();
+        String comment = field.getComment();
+        String defaultValue = field.getDefaultValue();
+
+        String addDDL =
+                String.format(
+                        ADD_DDL,
+                        identifier(database) + "." + identifier(tableName),
+                        identifier(name),
+                        typeName);
+        if (defaultValue != null) {
+            addDDL = addDDL + " DEFAULT " + quoteDefaultValue(defaultValue);
+        }
+        if (StringUtils.isNotEmpty(comment)) {
+            addDDL = addDDL + " COMMENT '" + quoteComment(comment) + "'";
+        }
+        return addDDL;
+    }
+
+    private static String quoteComment(String comment) {
+        return comment.replaceAll("'", "\\\\'");
+    }
+
+    private static String identifier(String name) {
+        return "`" + name + "`";
+    }
+
+    private static String quoteDefaultValue(String defaultValue) {
+        // DEFAULT current_timestamp not need quote
+        if (defaultValue.equalsIgnoreCase("current_timestamp")) {
+            return defaultValue;
+        }
+        return "'" + defaultValue + "'";
     }
 
     /** execute sql in doris. */
