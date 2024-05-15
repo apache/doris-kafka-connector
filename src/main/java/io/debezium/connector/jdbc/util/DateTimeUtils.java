@@ -15,8 +15,12 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
+ *
+ * Copied from
+ * https://github.com/debezium/debezium-connector-jdbc/blob/main/src/main/java/io/debezium/connector/jdbc/util/DateTimeUtils.java
  */
-package org.apache.doris.kafka.connector.converter.utils;
+
+package io.debezium.connector.jdbc.util;
 
 import io.debezium.time.Conversions;
 import java.sql.Timestamp;

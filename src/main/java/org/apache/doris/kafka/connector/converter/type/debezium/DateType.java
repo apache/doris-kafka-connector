@@ -18,9 +18,9 @@
  */
 package org.apache.doris.kafka.connector.converter.type.debezium;
 
+import io.debezium.connector.jdbc.util.DateTimeUtils;
 import io.debezium.time.Date;
 import org.apache.doris.kafka.connector.converter.type.AbstractDateType;
-import org.apache.doris.kafka.connector.converter.utils.DateTimeUtils;
 import org.apache.kafka.connect.errors.ConnectException;
 
 public class DateType extends AbstractDateType {
