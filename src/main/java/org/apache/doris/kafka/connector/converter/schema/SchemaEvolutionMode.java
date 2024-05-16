@@ -16,27 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.doris.kafka.connector.converter.type.connect;
 
-import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
-import org.apache.kafka.connect.data.Schema;
+package org.apache.doris.kafka.connector.converter.schema;
 
-public class ConnectFloat64Type extends AbstractConnectSchemaType {
+public enum SchemaEvolutionMode {
+    NONE("none"),
 
-    public static final ConnectFloat64Type INSTANCE = new ConnectFloat64Type();
+    BASIC("basic");
 
-    @Override
-    public String[] getRegistrationKeys() {
-        return new String[] {"FLOAT64"};
+    private final String name;
+
+    SchemaEvolutionMode(String name) {
+        this.name = name;
     }
 
-    @Override
-    public String getTypeName(Schema schema) {
-        return DorisType.DOUBLE;
+    public static SchemaEvolutionMode of(String name) {
+        return SchemaEvolutionMode.valueOf(name.toUpperCase());
     }
 
-    @Override
-    public boolean isNumber() {
-        return true;
+    public String getName() {
+        return name;
     }
 }

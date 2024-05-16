@@ -19,6 +19,8 @@
 package org.apache.doris.kafka.connector.converter.type.connect;
 
 import java.nio.ByteBuffer;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
 
 public class ConnectBytesType extends AbstractConnectSchemaType {
 
@@ -35,6 +37,11 @@ public class ConnectBytesType extends AbstractConnectSchemaType {
             return null;
         }
         return bytesToHexString(getByteArrayFromValue(sourceValue));
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return DorisType.STRING;
     }
 
     private byte[] getByteArrayFromValue(Object value) {

@@ -18,6 +18,9 @@
  */
 package org.apache.doris.kafka.connector.converter.type.connect;
 
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
+
 public class ConnectFloat32Type extends AbstractConnectSchemaType {
 
     public static final ConnectFloat32Type INSTANCE = new ConnectFloat32Type();
@@ -25,6 +28,11 @@ public class ConnectFloat32Type extends AbstractConnectSchemaType {
     @Override
     public String[] getRegistrationKeys() {
         return new String[] {"FLOAT32"};
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return DorisType.FLOAT;
     }
 
     @Override

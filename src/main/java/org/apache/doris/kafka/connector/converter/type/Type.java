@@ -19,6 +19,7 @@
 package org.apache.doris.kafka.connector.converter.type;
 
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.kafka.connect.data.Schema;
 
 /**
  * A type indicates the type of each column of kafka record, including various column types of
@@ -41,6 +42,8 @@ public interface Type {
 
     /** Get the actual converted value based on the column type. */
     Object getValue(Object sourceValue);
+
+    String getTypeName(Schema schema);
 
     boolean isNumber();
 }

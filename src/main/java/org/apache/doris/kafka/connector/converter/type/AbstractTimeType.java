@@ -18,5 +18,31 @@
  */
 package org.apache.doris.kafka.connector.converter.type;
 
+import java.util.Optional;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisTypeProperties;
+import org.apache.kafka.connect.data.Schema;
+
 /** An abstract temporal implementation of {@link Type} for {@code TIME} based columns. */
-public abstract class AbstractTimeType extends AbstractTemporalType {}
+public abstract class AbstractTimeType extends AbstractTemporalType {
+
+    @Override
+    public String getTypeName(Schema schema) {
+        // NOTE:
+        // The MySQL connector does not use the __debezium.source.column.scale parameter to pass
+        // the time column's precision but instead uses the __debezium.source.column.length key
+        // which differs from all other connector implementations.
+        //
+        final int precision = getTimePrecision(schema);
+        return String.format(
+                "%s(%s)",
+                DorisType.DATETIME,
+                Math.min(precision, DorisTypeProperties.MAX_SUPPORTED_DATE_TIME_PRECISION));
+    }
+
+    protected int getTimePrecision(Schema schema) {
+        final String length = getSourceColumnLength(schema).orElse("0");
+        final Optional<String> scale = getSourceColumnPrecision(schema);
+        return scale.map(Integer::parseInt).orElseGet(() -> Integer.parseInt(length));
+    }
+}

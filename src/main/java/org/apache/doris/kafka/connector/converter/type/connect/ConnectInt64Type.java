@@ -18,6 +18,9 @@
  */
 package org.apache.doris.kafka.connector.converter.type.connect;
 
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
+
 public class ConnectInt64Type extends AbstractConnectSchemaType {
 
     public static final ConnectInt64Type INSTANCE = new ConnectInt64Type();
@@ -25,6 +28,11 @@ public class ConnectInt64Type extends AbstractConnectSchemaType {
     @Override
     public String[] getRegistrationKeys() {
         return new String[] {"INT64"};
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return DorisType.BIGINT;
     }
 
     @Override

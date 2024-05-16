@@ -23,7 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.doris.kafka.connector.dialect.mysql.MysqlType;
+import org.apache.doris.kafka.connector.converter.type.Type;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -119,33 +119,48 @@ public class RecordDescriptor {
     public static class FieldDescriptor {
         private final Schema schema;
         private final String name;
+        private final Map<String, Type> typeRegistry;
+        private final Type type;
+        private final String typeName;
         private final String schemaTypeName;
         private final String schemaName;
         private String comment;
         private String defaultValue;
 
-        public FieldDescriptor(
-                Schema schema, String name, String schemaTypeName, String schemaName) {
+        public FieldDescriptor(Schema schema, String name, Map<String, Type> typeRegistry) {
             this.schema = schema;
             this.name = name;
-            this.schemaTypeName = schemaTypeName;
-            this.schemaName = schemaName;
+            this.typeRegistry = typeRegistry;
+            this.schemaName = schema.name();
+            this.schemaTypeName = schema.type().name();
+            this.type =
+                    Objects.nonNull(schema.name())
+                            ? typeRegistry.get(schema.name())
+                            : typeRegistry.get(schema.type().name());
+            this.typeName = type.getTypeName(schema);
         }
 
         public FieldDescriptor(
                 Schema schema,
                 String name,
-                String schemaTypeName,
-                String schemaName,
+                Map<String, Type> typeRegistry,
                 String comment,
                 String defaultValue) {
-            this(schema, name, schemaTypeName, schemaName);
+            this(schema, name, typeRegistry);
             this.comment = comment;
             this.defaultValue = defaultValue;
         }
 
         public String getName() {
             return name;
+        }
+
+        public Type getType() {
+            return type;
+        }
+
+        public String getTypeName() {
+            return typeName;
         }
 
         public String getSchemaName() {
@@ -172,7 +187,7 @@ public class RecordDescriptor {
     public static class Builder {
 
         private SinkRecord sinkRecord;
-        private Struct tableChange;
+        private Map<String, Type> typeRegistry;
 
         // Internal build state
         private final List<String> keyFieldNames = new ArrayList<>();
@@ -184,8 +199,8 @@ public class RecordDescriptor {
             return this;
         }
 
-        public Builder withTableChange(Struct tableChange) {
-            this.tableChange = tableChange;
+        public Builder withTypeRegistry(Map<String, Type> typeRegistry) {
+            this.typeRegistry = typeRegistry;
             return this;
         }
 
@@ -193,11 +208,7 @@ public class RecordDescriptor {
             Objects.requireNonNull(sinkRecord, "The sink record must be provided.");
 
             final boolean flattened = !isTombstone(sinkRecord) && isFlattened(sinkRecord);
-            if (Objects.nonNull(tableChange)) {
-                readTableChangeData(tableChange);
-            } else {
-                readSinkRecordNonKeyData(sinkRecord, flattened);
-            }
+            readSinkRecordNonKeyData(sinkRecord, flattened);
 
             return new RecordDescriptor(
                     sinkRecord,
@@ -206,27 +217,6 @@ public class RecordDescriptor {
                     nonKeyFieldNames,
                     allFields,
                     flattened);
-        }
-
-        private void readTableChangeData(final Struct tableChange) {
-            Struct tableChangeTable = tableChange.getStruct("table");
-            List<Object> tableChangeColumns = tableChangeTable.getArray("columns");
-            for (Object column : tableChangeColumns) {
-                Struct columnStruct = (Struct) column;
-                Schema schema = columnStruct.schema();
-                String name = columnStruct.getString("name");
-                String typeName = columnStruct.getString("typeName");
-                Integer length = columnStruct.getInt32("length");
-                Integer scale = columnStruct.getInt32("scale");
-                String dorisType = MysqlType.toDorisType(typeName, length, scale);
-                String comment = columnStruct.getString("comment");
-                String defaultValue = columnStruct.getString("defaultValueExpression");
-                nonKeyFieldNames.add(name);
-                allFields.put(
-                        name,
-                        new FieldDescriptor(
-                                schema, name, dorisType, schema.name(), comment, defaultValue));
-            }
         }
 
         private boolean isFlattened(SinkRecord record) {
@@ -266,8 +256,7 @@ public class RecordDescriptor {
         }
 
         private void applyNonKeyField(String name, Schema schema) {
-            FieldDescriptor fieldDescriptor =
-                    new FieldDescriptor(schema, name, schema.type().name(), schema.name());
+            FieldDescriptor fieldDescriptor = new FieldDescriptor(schema, name, typeRegistry);
             nonKeyFieldNames.add(fieldDescriptor.getName());
             allFields.put(fieldDescriptor.getName(), fieldDescriptor);
         }

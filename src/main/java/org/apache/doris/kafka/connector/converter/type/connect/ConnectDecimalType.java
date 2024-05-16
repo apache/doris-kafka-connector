@@ -19,7 +19,9 @@
 package org.apache.doris.kafka.connector.converter.type.connect;
 
 import org.apache.doris.kafka.connector.converter.type.AbstractType;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
 import org.apache.kafka.connect.data.Decimal;
+import org.apache.kafka.connect.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +34,17 @@ public class ConnectDecimalType extends AbstractType {
     @Override
     public String[] getRegistrationKeys() {
         return new String[] {Decimal.LOGICAL_NAME};
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        int scale = Integer.parseInt(getSchemaParameter(schema, "scale").orElse("0"));
+        int precision =
+                Integer.parseInt(
+                        getSchemaParameter(schema, "connect.decimal.precision").orElse("0"));
+        return precision <= 38
+                ? String.format("%s(%s,%s)", DorisType.DECIMAL, precision, Math.max(scale, 0))
+                : DorisType.STRING;
     }
 
     @Override

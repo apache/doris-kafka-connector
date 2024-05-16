@@ -22,6 +22,8 @@ import io.debezium.data.VariableScaleDecimal;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.apache.doris.kafka.connector.converter.type.AbstractType;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
 
@@ -49,6 +51,16 @@ public class VariableScaleDecimalType extends AbstractType {
                 String.format(
                         "Unexpected %s value '%s' with type '%s'",
                         getClass().getSimpleName(), sourceValue, sourceValue.getClass().getName()));
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        // The data passed by VariableScaleDecimal data types does not provide adequate information
+        // to
+        // resolve the precision and scale for the data type, so instead we're going to default to
+        // the
+        // maximum double-based data types for the dialect, using DOUBLE.
+        return DorisType.DOUBLE;
     }
 
     @Override

@@ -18,6 +18,9 @@
  */
 package org.apache.doris.kafka.connector.converter.type.connect;
 
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
+
 public class ConnectBooleanType extends AbstractConnectSchemaType {
 
     public static final ConnectBooleanType INSTANCE = new ConnectBooleanType();
@@ -25,5 +28,10 @@ public class ConnectBooleanType extends AbstractConnectSchemaType {
     @Override
     public String[] getRegistrationKeys() {
         return new String[] {"BOOLEAN"};
+    }
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return DorisType.BOOLEAN;
     }
 }

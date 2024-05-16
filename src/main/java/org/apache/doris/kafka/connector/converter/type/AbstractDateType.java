@@ -18,5 +18,14 @@
  */
 package org.apache.doris.kafka.connector.converter.type;
 
+import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
+import org.apache.kafka.connect.data.Schema;
+
 /** An abstract base class for all temporal date implementations of {@link Type}. */
-public abstract class AbstractDateType extends AbstractTemporalType {}
+public abstract class AbstractDateType extends AbstractTemporalType {
+
+    @Override
+    public String getTypeName(Schema schema) {
+        return DorisType.DATE;
+    }
+}
