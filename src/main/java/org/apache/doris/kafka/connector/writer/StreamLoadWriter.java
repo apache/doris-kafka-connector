@@ -62,14 +62,7 @@ public class StreamLoadWriter extends DorisWriter {
             DorisConnectMonitor connectMonitor) {
         super(topic, partition, dorisOptions, connectionProvider, connectMonitor);
         this.taskId = dorisOptions.getTaskId();
-        this.labelGenerator =
-                new LabelGenerator(
-                        dorisOptions.getLabelPrefix(),
-                        true,
-                        topic,
-                        partition,
-                        tableIdentifier,
-                        taskId);
+        this.labelGenerator = new LabelGenerator(topic, partition, tableIdentifier);
         BackendUtils backendUtils = BackendUtils.getInstance(dorisOptions, LOG);
         this.dorisCommitter = new DorisCommitter(dorisOptions, backendUtils);
         this.dorisStreamLoad = new DorisStreamLoad(backendUtils, dorisOptions, topic);
@@ -105,8 +98,6 @@ public class StreamLoadWriter extends DorisWriter {
         String tmpTopic = topic.replaceAll("\\.", "_");
         String querySQL =
                 queryPatten
-                        + dorisOptions.getLabelPrefix()
-                        + LoadConstants.FILE_DELIM_DEFAULT
                         + tmpTopic
                         + LoadConstants.FILE_DELIM_DEFAULT
                         + partition

@@ -89,7 +89,7 @@ public class FileNameUtils {
     }
 
     public static long labelToEndOffset(String label) {
-        return Long.parseLong(readFromFileName(label, 5));
+        return Long.parseLong(readFromFileName(label, 3));
     }
 
     /**

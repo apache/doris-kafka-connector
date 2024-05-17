@@ -67,16 +67,16 @@ public class TestStreamLoadWriter {
 
     private void fillLabel2Status() {
         label2Status.put(
-                "sink-connector-test__KC_avro-complex10__KC_2__KC_test_person_complex__KC_2__KC_321__KC_1706149860395",
+                "KC_avro-complex10__KC_2__KC_test_person_complex__KC_321__KC_1706149860395",
                 "ABORT");
         label2Status.put(
-                "sink-connector-test__KC_avro-complex10__KC_2__KC_test_person_complex__KC_2__KC_983__KC_1706149860395",
+                "KC_avro-complex10__KC_2__KC_test_person_complex__KC_983__KC_1706149860395",
                 "ABORT");
         label2Status.put(
-                "sink-connector-test__KC_avro-complex10__KC_2__KC_test_person_complex__KC_2__KC_781__KC_1706149860395",
+                "avro-complex10__KC_2__KC_test_person_complex__KC_781__KC_1706149860395",
                 "VISIBLE");
         label2Status.put(
-                "sink-connector-test__KC_avro-complex10__KC_2__KC_test_person_complex__KC_2__KC_832__KC_1706149860395",
+                "avro-complex10__KC_2__KC_test_person_complex__KC_832__KC_1706149860395",
                 "VISIBLE");
     }
 
