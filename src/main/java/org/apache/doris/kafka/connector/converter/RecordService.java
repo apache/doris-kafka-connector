@@ -142,6 +142,9 @@ public class RecordService {
             String tableName, RecordDescriptor recordDescriptor) {
         if (!hasTable(tableName)) {
             // TODO Table does not exist, lets attempt to create it.
+            LOG.warn("The {} table does not exist, please create it manually.", tableName);
+            throw new DorisException(
+                    "The " + tableName + " table does not exist, please create it manually.");
         } else {
             // Table exists, lets attempt to alter it if necessary.
             alterTableIfNeeded(tableName, recordDescriptor);
@@ -149,7 +152,14 @@ public class RecordService {
     }
 
     private boolean hasTable(String tableName) {
-        return dorisSystemService.tableExists(dorisOptions.getDatabase(), tableName);
+        if (!dorisTableDescriptorCache.containsKey(tableName)) {
+            boolean exist = dorisSystemService.tableExists(dorisOptions.getDatabase(), tableName);
+            if (exist) {
+                dorisTableDescriptorCache.put(tableName, null);
+            }
+            return exist;
+        }
+        return true;
     }
 
     private void alterTableIfNeeded(String tableName, RecordDescriptor record) {
@@ -197,7 +207,8 @@ public class RecordService {
     }
 
     private TableDescriptor fetchDorisTableDescriptor(String tableName) {
-        if (!dorisTableDescriptorCache.containsKey(tableName)) {
+        if (!dorisTableDescriptorCache.containsKey(tableName)
+                || Objects.isNull(dorisTableDescriptorCache.get(tableName))) {
             TableDescriptor tableDescriptor = obtainTableSchema(tableName);
             dorisTableDescriptorCache.put(tableName, tableDescriptor);
         }
