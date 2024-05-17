@@ -66,6 +66,7 @@ public class RecordService {
     private DorisOptions dorisOptions;
     private RecordTypeRegister recordTypeRegister;
     private Set<RecordDescriptor.FieldDescriptor> missingFields;
+    private Map<String, TableDescriptor> dorisTableDescriptorCache;
 
     public RecordService() {
         this.converter = new JsonConverter();
@@ -80,6 +81,7 @@ public class RecordService {
         this.recordTypeRegister = new RecordTypeRegister(dorisOptions);
         this.dorisSystemService = new DorisSystemService(dorisOptions);
         this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
+        this.dorisTableDescriptorCache = new HashMap<>();
     }
 
     /**
@@ -152,7 +154,7 @@ public class RecordService {
 
     private void alterTableIfNeeded(String tableName, RecordDescriptor record) {
         // Resolve table metadata from the database
-        final TableDescriptor table = obtainTableSchema(tableName);
+        final TableDescriptor table = fetchDorisTableDescriptor(tableName);
 
         missingFields = resolveMissingFields(record, table);
         if (missingFields.isEmpty()) {
@@ -177,6 +179,8 @@ public class RecordService {
         for (RecordDescriptor.FieldDescriptor missingField : missingFields) {
             schemaChangeManager.addColumnDDL(tableName, missingField);
         }
+        TableDescriptor newTableDescriptor = obtainTableSchema(tableName);
+        dorisTableDescriptorCache.put(tableName, newTableDescriptor);
     }
 
     private Set<RecordDescriptor.FieldDescriptor> resolveMissingFields(
@@ -192,9 +196,15 @@ public class RecordService {
         return missingFields;
     }
 
+    private TableDescriptor fetchDorisTableDescriptor(String tableName) {
+        if (!dorisTableDescriptorCache.containsKey(tableName)) {
+            TableDescriptor tableDescriptor = obtainTableSchema(tableName);
+            dorisTableDescriptorCache.put(tableName, tableDescriptor);
+        }
+        return dorisTableDescriptorCache.get(tableName);
+    }
+
     private TableDescriptor obtainTableSchema(String tableName) {
-        // TODO when the table structure is obtained from doris for first time, it should be
-        // obtained in the cache later.
         Schema schema =
                 RestService.getSchema(dorisOptions, dorisOptions.getDatabase(), tableName, LOG);
         List<ColumnDescriptor> columnDescriptors = new ArrayList<>();
