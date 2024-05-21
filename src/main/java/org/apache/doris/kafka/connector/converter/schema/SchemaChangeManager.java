@@ -19,6 +19,9 @@
 
 package org.apache.doris.kafka.connector.converter.schema;
 
+import static java.net.HttpURLConnection.HTTP_OK;
+
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.Serializable;
@@ -46,6 +49,8 @@ public class SchemaChangeManager implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(SchemaChangeManager.class);
     private static final String ADD_DDL = "ALTER TABLE %s ADD COLUMN %s %s";
     private static final String SCHEMA_CHANGE_API = "http://%s/api/query/default_cluster/%s";
+    private static final String GET_COLUMN_EXISTS_TEMPLATE =
+            "SELECT COLUMN_NAME FROM information_schema.`COLUMNS` WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' AND COLUMN_NAME = '%s'";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final DorisOptions dorisOptions;
 
@@ -64,6 +69,15 @@ public class SchemaChangeManager implements Serializable {
 
     public void addColumnDDL(String tableName, RecordDescriptor.FieldDescriptor field) {
         try {
+            // check the add column whether exist in table.
+            if (checkColumnExists(dorisOptions.getDatabase(), tableName, field.getName())) {
+                LOG.warn(
+                        "The column {} already exists in table {}, no need to add it again",
+                        field.getName(),
+                        tableName);
+                return;
+            }
+
             String addColumnDDL = buildAddColumnDDL(dorisOptions.getDatabase(), tableName, field);
             boolean status = execute(addColumnDDL, dorisOptions.getDatabase());
             LOG.info(
@@ -146,7 +160,7 @@ public class SchemaChangeManager implements Serializable {
             CloseableHttpResponse response = httpclient.execute(request);
             final int statusCode = response.getStatusLine().getStatusCode();
             final String reasonPhrase = response.getStatusLine().getReasonPhrase();
-            if (statusCode == 200 && response.getEntity() != null) {
+            if (statusCode == HTTP_OK && response.getEntity() != null) {
                 responseEntity = EntityUtils.toString(response.getEntity());
                 return objectMapper.readValue(responseEntity, Map.class);
             } else {
@@ -160,6 +174,34 @@ public class SchemaChangeManager implements Serializable {
             LOG.error("SchemaChange request error,", e);
             throw new SchemaChangeException("SchemaChange request error with " + e.getMessage());
         }
+    }
+
+    public boolean checkColumnExists(String database, String table, String columnName)
+            throws IllegalArgumentException, IOException {
+        String existsQuery = buildColumnExistsQuery(database, table, columnName);
+        HttpPost httpPost = buildHttpPost(existsQuery, database);
+        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+            CloseableHttpResponse response = httpclient.execute(httpPost);
+            final int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == HTTP_OK && response.getEntity() != null) {
+                String loadResult = EntityUtils.toString(response.getEntity());
+                JsonNode responseNode = objectMapper.readTree(loadResult);
+                String code = responseNode.get("code").asText("-1");
+                if (code.equals("0")) {
+                    JsonNode data = responseNode.get("data").get("data");
+                    if (!data.isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("check column exist request error {}, default return false", e.getMessage());
+        }
+        return false;
+    }
+
+    public static String buildColumnExistsQuery(String database, String table, String column) {
+        return String.format(GET_COLUMN_EXISTS_TEMPLATE, database, table, column);
     }
 
     private String authHeader() {
