@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -89,5 +90,23 @@ public class TestDorisOptions {
 
         String httpUrl = dorisOptions.getHttpUrl();
         Assert.assertTrue(result.contains(httpUrl));
+    }
+
+    @Test
+    public void testDorisOption() {
+        /**
+         * doris.urls=172.21.16.12 doris.http.port=28030 doris.query.port=29030 doris.user=root
+         * doris.password=123456 doris.database=demo
+         */
+        props.put("doris.urls", "172.21.16.12");
+        props.put("doris.http.port", "28030");
+        props.put("doris.query.port", "29030");
+        props.put("doris.user", "root");
+        props.put("doris.password", "123456");
+        props.put("doris.database", "demo");
+        dorisOptions = new DorisOptions((Map) props);
+        DorisSystemService dorisSystemService = new DorisSystemService(dorisOptions);
+        boolean columnExist = dorisSystemService.isColumnExist("demo", "student", "sname");
+        System.out.println(columnExist);
     }
 }
