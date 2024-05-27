@@ -134,9 +134,12 @@ public class RecordDescriptor {
             this.schemaName = schema.name();
             this.schemaTypeName = schema.type().name();
             this.type =
-                    Objects.nonNull(schema.name())
-                            ? typeRegistry.get(schema.name())
-                            : typeRegistry.get(schema.type().name());
+                    typeRegistry.getOrDefault(
+                            schema.name(), typeRegistry.get(schema.type().name()));
+            if (this.type == null) {
+                throw new IllegalArgumentException(
+                        "Type not found in registry for schema: " + schema);
+            }
             this.typeName = type.getTypeName(schema);
         }
 
