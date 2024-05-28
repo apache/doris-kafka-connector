@@ -18,9 +18,9 @@
  */
 package org.apache.doris.kafka.connector.converter.type.debezium;
 
-import io.debezium.connector.jdbc.util.DateTimeUtils;
 import io.debezium.time.MicroTime;
 import java.time.LocalTime;
+import org.apache.doris.kafka.connector.converter.type.util.DateTimeUtils;
 
 public class MicroTimeType extends AbstractDebeziumTimeType {
 

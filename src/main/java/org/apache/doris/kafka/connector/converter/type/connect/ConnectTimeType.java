@@ -18,12 +18,12 @@
  */
 package org.apache.doris.kafka.connector.converter.type.connect;
 
-import io.debezium.connector.jdbc.util.DateTimeUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Date;
 import org.apache.doris.kafka.connector.converter.type.AbstractTimeType;
+import org.apache.doris.kafka.connector.converter.type.util.DateTimeUtils;
 import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.errors.ConnectException;
 

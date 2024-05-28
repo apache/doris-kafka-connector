@@ -126,9 +126,9 @@ public class RecordService {
     private void validate(SinkRecord record) {
         if (isSchemaChange(record)) {
             LOG.warn(
-                    "Schema change records are not supported by JDBC connector. Adjust `topics` or `topics.regex` to exclude schema change topic.");
+                    "Schema change records are not supported by doris-kafka-connector. Adjust `topics` or `topics.regex` to exclude schema change topic.");
             throw new DorisException(
-                    "Schema change records are not supported by JDBC connector. Adjust `topics` or `topics.regex` to exclude schema change topic.");
+                    "Schema change records are not supported by doris-kafka-connector. Adjust `topics` or `topics.regex` to exclude schema change topic.");
         }
     }
 
