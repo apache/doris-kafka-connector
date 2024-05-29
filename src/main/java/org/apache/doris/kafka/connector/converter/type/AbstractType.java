@@ -18,10 +18,10 @@
  */
 package org.apache.doris.kafka.connector.converter.type;
 
-import io.debezium.connector.jdbc.util.SchemaUtils;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.converter.type.util.SchemaUtils;
 import org.apache.kafka.connect.data.Schema;
 
 /** An abstract implementation of {@link Type}, which all types should extend. */

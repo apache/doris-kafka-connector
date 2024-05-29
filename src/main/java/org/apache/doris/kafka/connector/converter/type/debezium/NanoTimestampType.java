@@ -18,10 +18,10 @@
  */
 package org.apache.doris.kafka.connector.converter.type.debezium;
 
-import io.debezium.connector.jdbc.util.DateTimeUtils;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTimestamp;
 import java.time.LocalDateTime;
+import org.apache.doris.kafka.connector.converter.type.util.DateTimeUtils;
 
 /**
  * An implementation of {@link org.apache.doris.kafka.connector.converter.type.Type} for {@link

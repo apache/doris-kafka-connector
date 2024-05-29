@@ -18,9 +18,10 @@
  *
  * Copied from
  * https://github.com/debezium/debezium-connector-jdbc/blob/main/src/main/java/io/debezium/connector/jdbc/util/SchemaUtils.java
+ * modified by doris.
  */
 
-package io.debezium.connector.jdbc.util;
+package org.apache.doris.kafka.connector.converter.type.util;
 
 import java.util.Objects;
 import java.util.Optional;
