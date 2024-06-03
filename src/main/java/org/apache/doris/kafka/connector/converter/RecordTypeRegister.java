@@ -36,11 +36,15 @@ import org.apache.doris.kafka.connector.converter.type.connect.ConnectMapToConne
 import org.apache.doris.kafka.connector.converter.type.connect.ConnectStringType;
 import org.apache.doris.kafka.connector.converter.type.connect.ConnectTimeType;
 import org.apache.doris.kafka.connector.converter.type.connect.ConnectTimestampType;
+import org.apache.doris.kafka.connector.converter.type.debezium.ArrayType;
 import org.apache.doris.kafka.connector.converter.type.debezium.DateType;
+import org.apache.doris.kafka.connector.converter.type.debezium.GeographyType;
+import org.apache.doris.kafka.connector.converter.type.debezium.GeometryType;
 import org.apache.doris.kafka.connector.converter.type.debezium.MicroTimeType;
 import org.apache.doris.kafka.connector.converter.type.debezium.MicroTimestampType;
 import org.apache.doris.kafka.connector.converter.type.debezium.NanoTimeType;
 import org.apache.doris.kafka.connector.converter.type.debezium.NanoTimestampType;
+import org.apache.doris.kafka.connector.converter.type.debezium.PointType;
 import org.apache.doris.kafka.connector.converter.type.debezium.TimeType;
 import org.apache.doris.kafka.connector.converter.type.debezium.TimestampType;
 import org.apache.doris.kafka.connector.converter.type.debezium.VariableScaleDecimalType;
@@ -73,6 +77,10 @@ public class RecordTypeRegister {
         registerType(ZonedTimeType.INSTANCE);
         registerType(ZonedTimestampType.INSTANCE);
         registerType(VariableScaleDecimalType.INSTANCE);
+        registerType(PointType.INSTANCE);
+        registerType(GeographyType.INSTANCE);
+        registerType(GeometryType.INSTANCE);
+        registerType(ArrayType.INSTANCE);
 
         // Supported connect data types
         registerType(ConnectBooleanType.INSTANCE);
