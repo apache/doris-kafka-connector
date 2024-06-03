@@ -14,7 +14,7 @@ public class ArrayType extends AbstractType {
 
     @Override
     public String getTypeName(Schema schema) {
-        return DorisType.STRING;
+        return DorisType.ARRAY;
     }
 
     @Override
