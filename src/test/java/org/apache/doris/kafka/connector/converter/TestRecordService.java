@@ -72,7 +72,7 @@ public class TestRecordService {
         props.load(stream);
         props.put("task_id", "1");
         props.put("converter.mode", "debezium_ingestion");
-        props.put("schema.evolution", "basic");
+        props.put("debezium.schema.evolution", "basic");
         props.put(
                 "doris.topic2table.map",
                 "avro_schema.wdl_test.example_table:example_table,normal.wdl_test.test_sink_normal:test_sink_normal");
