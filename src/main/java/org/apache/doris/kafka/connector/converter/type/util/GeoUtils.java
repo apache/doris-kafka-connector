@@ -22,7 +22,6 @@ package org.apache.doris.kafka.connector.converter.type.util;
 import com.esri.core.geometry.ogc.OGCGeometry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,7 +39,6 @@ public class GeoUtils {
         // the Geometry datatype in MySQL will be converted to
         // a String with Json format
         final ObjectMapper objectMapper = new ObjectMapper();
-        final ObjectWriter objectWriter = objectMapper.writer();
         Struct geometryStruct = (Struct) sourceValue;
 
         try {

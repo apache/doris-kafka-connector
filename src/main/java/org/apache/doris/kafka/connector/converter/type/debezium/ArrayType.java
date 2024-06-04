@@ -33,7 +33,7 @@ public class ArrayType extends AbstractType {
 
     @Override
     public String getTypeName(Schema schema) {
-        return DorisType.ARRAY;
+        return DorisType.STRING;
     }
 
     @Override
