@@ -95,8 +95,8 @@ public class DorisOptions {
         this.schemaEvolutionMode =
                 SchemaEvolutionMode.of(
                         config.getOrDefault(
-                                DorisSinkConnectorConfig.SCHEMA_EVOLUTION,
-                                DorisSinkConnectorConfig.SCHEMA_EVOLUTION_DEFAULT));
+                                DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION,
+                                DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION_DEFAULT));
 
         this.fileSize = Integer.parseInt(config.get(DorisSinkConnectorConfig.BUFFER_SIZE_BYTES));
         this.recordNum =

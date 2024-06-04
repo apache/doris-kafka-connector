@@ -19,6 +19,8 @@
 
 package org.apache.doris.kafka.connector.converter.schema;
 
+import static java.net.HttpURLConnection.HTTP_OK;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.Serializable;
@@ -30,6 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.converter.RecordDescriptor;
 import org.apache.doris.kafka.connector.exception.SchemaChangeException;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -48,9 +51,11 @@ public class SchemaChangeManager implements Serializable {
     private static final String SCHEMA_CHANGE_API = "http://%s/api/query/default_cluster/%s";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final DorisOptions dorisOptions;
+    private DorisSystemService dorisSystemService;
 
     public SchemaChangeManager(DorisOptions dorisOptions) {
         this.dorisOptions = dorisOptions;
+        this.dorisSystemService = new DorisSystemService(dorisOptions);
     }
 
     private boolean handleSchemaChange(Map<String, Object> responseMap, String responseEntity) {
@@ -64,6 +69,16 @@ public class SchemaChangeManager implements Serializable {
 
     public void addColumnDDL(String tableName, RecordDescriptor.FieldDescriptor field) {
         try {
+            // check the add column whether exist in table.
+            if (dorisSystemService.isColumnExist(
+                    dorisOptions.getDatabase(), tableName, field.getName())) {
+                LOG.warn(
+                        "The column {} already exists in table {}, no need to add it again",
+                        field.getName(),
+                        tableName);
+                return;
+            }
+
             String addColumnDDL = buildAddColumnDDL(dorisOptions.getDatabase(), tableName, field);
             boolean status = execute(addColumnDDL, dorisOptions.getDatabase());
             LOG.info(
@@ -146,7 +161,7 @@ public class SchemaChangeManager implements Serializable {
             CloseableHttpResponse response = httpclient.execute(request);
             final int statusCode = response.getStatusLine().getStatusCode();
             final String reasonPhrase = response.getStatusLine().getReasonPhrase();
-            if (statusCode == 200 && response.getEntity() != null) {
+            if (statusCode == HTTP_OK && response.getEntity() != null) {
                 responseEntity = EntityUtils.toString(response.getEntity());
                 return objectMapper.readValue(responseEntity, Map.class);
             } else {

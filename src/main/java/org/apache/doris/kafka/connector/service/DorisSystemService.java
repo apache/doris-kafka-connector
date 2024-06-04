@@ -35,6 +35,8 @@ import org.slf4j.LoggerFactory;
 public class DorisSystemService {
 
     private static final Logger LOG = LoggerFactory.getLogger(DorisSystemService.class);
+    private static final String GET_COLUMN_EXISTS_TEMPLATE =
+            "SELECT COLUMN_NAME FROM information_schema.`COLUMNS` WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?";
     private final JdbcConnectionProvider jdbcConnectionProvider;
 
     public DorisSystemService(DorisOptions dorisOptions) {
@@ -68,6 +70,13 @@ public class DorisSystemService {
                 1,
                 null,
                 databaseName);
+    }
+
+    public boolean isColumnExist(String database, String tableName, String columnName) {
+        List<String> columnList =
+                extractColumnValuesBySQL(
+                        GET_COLUMN_EXISTS_TEMPLATE, 1, null, database, tableName, columnName);
+        return !columnList.isEmpty();
     }
 
     public List<String> extractColumnValuesBySQL(

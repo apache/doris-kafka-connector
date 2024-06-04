@@ -82,8 +82,9 @@ public class DorisSinkConnectorConfig {
 
     // Prefix for Doris StreamLoad specific properties.
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
-    public static final String SCHEMA_EVOLUTION = "schema.evolution";
-    public static final String SCHEMA_EVOLUTION_DEFAULT = SchemaEvolutionMode.NONE.getName();
+    public static final String DEBEZIUM_SCHEMA_EVOLUTION = "debezium.schema.evolution";
+    public static final String DEBEZIUM_SCHEMA_EVOLUTION_DEFAULT =
+            SchemaEvolutionMode.NONE.getName();
 
     // metrics
     public static final String JMX_OPT = "jmx";
