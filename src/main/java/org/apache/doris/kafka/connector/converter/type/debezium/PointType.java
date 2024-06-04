@@ -41,6 +41,6 @@ public class PointType extends AbstractGeometryType {
             return GeoUtils.handleGeoStructData(sourceValue);
         }
 
-        return sourceValue.toString();
+        return sourceValue;
     }
 }

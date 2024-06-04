@@ -42,6 +42,6 @@ public class GeometryType extends AbstractGeometryType {
             return GeoUtils.handleGeoStructData(sourceValue);
         }
 
-        return sourceValue.toString();
+        return sourceValue;
     }
 }

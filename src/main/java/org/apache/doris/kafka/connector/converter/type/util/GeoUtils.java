@@ -60,7 +60,7 @@ public class GeoUtils {
             }
 
             geometryInfo.put("srid", srid.orElse(0));
-            return objectWriter.writeValueAsString(geometryInfo);
+            return geometryInfo;
         } catch (Exception e) {
             LOGGER.warn("Failed to parse Geometry datatype, converting the value to null", e);
             return null;
