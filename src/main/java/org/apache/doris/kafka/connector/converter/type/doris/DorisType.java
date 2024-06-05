@@ -30,10 +30,7 @@ public class DorisType {
     public static final String DOUBLE = "DOUBLE";
     public static final String DECIMAL = "DECIMAL";
     public static final String DATE = "DATE";
-    public static final String DATE_V2 = "DATEV2";
-    public static final String DECIMALV3 = "DECIMALV3";
     public static final String DATETIME = "DATETIME";
-    public static final String DATETIME_V2 = "DATETIMEV2";
     public static final String CHAR = "CHAR";
     public static final String VARCHAR = "VARCHAR";
     public static final String STRING = "STRING";
@@ -44,7 +41,4 @@ public class DorisType {
     public static final String JSON = "JSON";
     public static final String MAP = "MAP";
     public static final String STRUCT = "STRUCT";
-    public static final String IPV4 = "IPV4";
-    public static final String IPV6 = "IPV6";
-    public static final String VARIANT = "VARIANT";
 }
