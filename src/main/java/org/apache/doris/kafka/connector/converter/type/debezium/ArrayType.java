@@ -77,8 +77,8 @@ public class ArrayType extends AbstractType {
         if (sourceValue instanceof ArrayList) {
             List<Object> resultList = new ArrayList<>();
             ArrayList<?> convertedValue = (ArrayList<?>) sourceValue;
+            Type valueType = new RecordTypeRegister(dorisOptions).getTypeRegistry().get(type);
             for (Object value : convertedValue) {
-                Type valueType = new RecordTypeRegister(dorisOptions).getTypeRegistry().get(type);
                 if (valueType == null) {
                     return sourceValue;
                 }
