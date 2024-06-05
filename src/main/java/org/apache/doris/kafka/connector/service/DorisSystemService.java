@@ -22,8 +22,10 @@ package org.apache.doris.kafka.connector.service;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
@@ -47,29 +49,31 @@ public class DorisSystemService {
             Collections.singletonList("information_schema");
 
     public boolean tableExists(String database, String table) {
-        return databaseExists(database) && listTables(database).contains(table);
+        return listTables(database).contains(table);
     }
 
     public boolean databaseExists(String database) {
         return listDatabases().contains(database);
     }
 
-    public List<String> listDatabases() {
-        return extractColumnValuesBySQL(
-                "SELECT `SCHEMA_NAME` FROM `INFORMATION_SCHEMA`.`SCHEMATA`;",
-                1,
-                dbName -> !builtinDatabases.contains(dbName));
+    public Set<String> listDatabases() {
+        return new HashSet<>(
+                extractColumnValuesBySQL(
+                        "SELECT `SCHEMA_NAME` FROM `INFORMATION_SCHEMA`.`SCHEMATA`;",
+                        1,
+                        dbName -> !builtinDatabases.contains(dbName)));
     }
 
-    public List<String> listTables(String databaseName) {
+    public Set<String> listTables(String databaseName) {
         if (!databaseExists(databaseName)) {
             throw new DorisException("database" + databaseName + " is not exists");
         }
-        return extractColumnValuesBySQL(
-                "SELECT TABLE_NAME FROM information_schema.`TABLES` WHERE TABLE_SCHEMA = ?",
-                1,
-                null,
-                databaseName);
+        return new HashSet<>(
+                extractColumnValuesBySQL(
+                        "SELECT TABLE_NAME FROM information_schema.`TABLES` WHERE TABLE_SCHEMA = ?",
+                        1,
+                        null,
+                        databaseName));
     }
 
     public boolean isColumnExist(String database, String tableName, String columnName) {
