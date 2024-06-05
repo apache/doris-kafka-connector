@@ -74,7 +74,7 @@ public class ArrayType extends AbstractType {
                         ? valueSchema.name()
                         : valueSchema.type().name();
 
-        if (sourceValue instanceof ArrayList) {
+        if (sourceValue instanceof List) {
             List<Object> resultList = new ArrayList<>();
             ArrayList<?> convertedValue = (ArrayList<?>) sourceValue;
             Type valueType = new RecordTypeRegister(dorisOptions).getTypeRegistry().get(type);
