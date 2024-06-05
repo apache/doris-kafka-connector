@@ -278,7 +278,7 @@ public class RecordService {
                     field.getSchema().isOptional()
                             ? source.getWithoutDefault(fieldName)
                             : source.get(fieldName);
-            Object convertValue = type.getValue(value);
+            Object convertValue = type.getValue(value, field.getSchema());
             if (Objects.nonNull(convertValue) && !type.isNumber()) {
                 filedMapping.put(fieldName, convertValue.toString());
             } else {

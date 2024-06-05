@@ -19,12 +19,25 @@
 
 package org.apache.doris.kafka.connector.converter.type.debezium;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.converter.RecordTypeRegister;
 import org.apache.doris.kafka.connector.converter.type.AbstractType;
+import org.apache.doris.kafka.connector.converter.type.Type;
 import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
 import org.apache.kafka.connect.data.Schema;
 
 public class ArrayType extends AbstractType {
+    DorisOptions dorisOptions;
+    private static final String ARRAY_TYPE_TEMPLATE = "%s<%s>";
     public static final ArrayType INSTANCE = new ArrayType();
+
+    @Override
+    public void configure(DorisOptions dorisOptions) {
+        this.dorisOptions = dorisOptions;
+    }
 
     @Override
     public String[] getRegistrationKeys() {
@@ -33,11 +46,47 @@ public class ArrayType extends AbstractType {
 
     @Override
     public String getTypeName(Schema schema) {
+        if (schema.valueSchema().isOptional()) {
+            Schema valueSchema = schema.valueSchema();
+            String type =
+                    Objects.nonNull(valueSchema.name())
+                            ? valueSchema.name()
+                            : valueSchema.type().name();
+            Type valueType = new RecordTypeRegister(dorisOptions).getTypeRegistry().get(type);
+            if (valueType == null) {
+                return DorisType.STRING;
+            }
+            String typeName = valueType.getTypeName(schema);
+            return String.format(ARRAY_TYPE_TEMPLATE, DorisType.ARRAY, typeName);
+        }
         return DorisType.STRING;
     }
 
     @Override
-    public Object getValue(Object sourceValue) {
-        return sourceValue.toString();
+    public Object getValue(Object sourceValue, Schema schema) {
+
+        if (sourceValue == null) {
+            return null;
+        }
+        Schema valueSchema = schema.valueSchema();
+        String type =
+                Objects.nonNull(valueSchema.name())
+                        ? valueSchema.name()
+                        : valueSchema.type().name();
+
+        if (sourceValue instanceof ArrayList) {
+            List<Object> resultList = new ArrayList<>();
+            ArrayList<?> convertedValue = (ArrayList<?>) sourceValue;
+            for (Object value : convertedValue) {
+                Type valueType = new RecordTypeRegister(dorisOptions).getTypeRegistry().get(type);
+                if (valueType == null) {
+                    return sourceValue;
+                }
+                resultList.add(valueType.getValue(value, valueSchema));
+            }
+            return resultList;
+        }
+
+        return sourceValue;
     }
 }

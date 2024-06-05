@@ -43,6 +43,10 @@ public interface Type {
     /** Get the actual converted value based on the column type. */
     Object getValue(Object sourceValue);
 
+    default Object getValue(Object sourcevalue, Schema schema) {
+        return getValue(sourcevalue);
+    }
+
     String getTypeName(Schema schema);
 
     boolean isNumber();
