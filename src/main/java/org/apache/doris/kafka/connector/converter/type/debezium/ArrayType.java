@@ -30,13 +30,17 @@ import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
 import org.apache.kafka.connect.data.Schema;
 
 public class ArrayType extends AbstractType {
-    DorisOptions dorisOptions;
     private static final String ARRAY_TYPE_TEMPLATE = "%s<%s>";
     public static final ArrayType INSTANCE = new ArrayType();
+    private DorisOptions dorisOptions;
+    private RecordTypeRegister recordTypeRegister;
 
     @Override
     public void configure(DorisOptions dorisOptions) {
-        this.dorisOptions = dorisOptions;
+        if (this.dorisOptions == null) {
+            this.dorisOptions = dorisOptions;
+            this.recordTypeRegister = new RecordTypeRegister(dorisOptions);
+        }
     }
 
     @Override
@@ -52,7 +56,7 @@ public class ArrayType extends AbstractType {
                     Objects.nonNull(valueSchema.name())
                             ? valueSchema.name()
                             : valueSchema.type().name();
-            Type valueType = new RecordTypeRegister(dorisOptions).getTypeRegistry().get(type);
+            Type valueType = recordTypeRegister.getTypeRegistry().get(type);
             if (valueType == null) {
                 return DorisType.STRING;
             }
@@ -77,11 +81,12 @@ public class ArrayType extends AbstractType {
         if (sourceValue instanceof List) {
             List<Object> resultList = new ArrayList<>();
             ArrayList<?> convertedValue = (ArrayList<?>) sourceValue;
-            Type valueType = new RecordTypeRegister(dorisOptions).getTypeRegistry().get(type);
+            Type valueType = recordTypeRegister.getTypeRegistry().get(type);
+            if (valueType == null) {
+                return sourceValue;
+            }
+
             for (Object value : convertedValue) {
-                if (valueType == null) {
-                    return sourceValue;
-                }
                 resultList.add(valueType.getValue(value, valueSchema));
             }
             return resultList;
