@@ -78,7 +78,7 @@ public class DorisStreamLoad extends DataLoad {
                 .addCommonHeader()
                 .setEntity(entity)
                 .addHiddenColumns(dorisOptions.isEnableDelete())
-                .enable2PC()
+                .enable2PC(dorisOptions.enable2PC())
                 .addProperties(dorisOptions.getStreamLoadProp());
 
         LOG.info("stream load started for {} on host {}", label, hostPort);

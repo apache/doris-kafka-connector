@@ -92,6 +92,8 @@ public class DorisSinkConnectorConfig {
 
     public static final String ENABLE_DELETE = "enable.delete";
     public static final boolean ENABLE_DELETE_DEFAULT = false;
+    public static final String ENABLE_2PC = "enable.2pc";
+    public static final boolean ENABLE_2PC_DEFAULT = true;
 
     private static final ConfigDef.Validator nonEmptyStringValidator =
             new ConfigDef.NonEmptyString();
