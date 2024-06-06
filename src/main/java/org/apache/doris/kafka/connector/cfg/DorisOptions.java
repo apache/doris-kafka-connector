@@ -51,6 +51,7 @@ public class DorisOptions {
     private boolean enableCustomJMX;
     private final int taskId;
     private final boolean enableDelete;
+    private boolean enable2PC;
     private boolean autoRedirect = true;
     private int requestReadTimeoutMs;
     private int requestConnectTimeoutMs;
@@ -112,6 +113,10 @@ public class DorisOptions {
         }
         this.topicMap = getTopicToTableMap(config);
 
+        this.enable2PC = DorisSinkConnectorConfig.ENABLE_2PC_DEFAULT;
+        if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
+            this.enable2PC = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC));
+        }
         enableCustomJMX = DorisSinkConnectorConfig.JMX_OPT_DEFAULT;
         if (config.containsKey(DorisSinkConnectorConfig.JMX_OPT)) {
             enableCustomJMX = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.JMX_OPT));
@@ -200,6 +205,10 @@ public class DorisOptions {
 
     public String getTopicMapTable(String topic) {
         return topicMap.get(topic);
+    }
+
+    public boolean enable2PC() {
+        return enable2PC;
     }
 
     public Map<String, String> getTopicMap() {

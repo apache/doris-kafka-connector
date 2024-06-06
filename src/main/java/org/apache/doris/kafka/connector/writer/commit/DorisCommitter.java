@@ -57,7 +57,7 @@ public class DorisCommitter {
     }
 
     public void commit(List<DorisCommittable> dorisCommittables) {
-        if (dorisCommittables.isEmpty()) {
+        if (!dorisOptions.enable2PC() || dorisCommittables.isEmpty()) {
             return;
         }
         for (DorisCommittable dorisCommittable : dorisCommittables) {

@@ -110,8 +110,8 @@ public class HttpPutBuilder {
         return this;
     }
 
-    public HttpPutBuilder enable2PC() {
-        header.put("two_phase_commit", "true");
+    public HttpPutBuilder enable2PC(boolean enable2PC) {
+        header.put("two_phase_commit", String.valueOf(enable2PC));
         return this;
     }
 
