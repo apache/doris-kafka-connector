@@ -37,9 +37,9 @@ public class ArrayType extends AbstractType {
 
     @Override
     public void configure(DorisOptions dorisOptions) {
-        if (this.dorisOptions == null) {
+        if (this.dorisOptions == null && this.recordTypeRegister == null) {
             this.dorisOptions = dorisOptions;
-            this.recordTypeRegister = new RecordTypeRegister(dorisOptions);
+            registerNestedArrayType();
         }
     }
 
@@ -56,6 +56,9 @@ public class ArrayType extends AbstractType {
                     Objects.nonNull(valueSchema.name())
                             ? valueSchema.name()
                             : valueSchema.type().name();
+            if (recordTypeRegister == null) {
+                registerNestedArrayType();
+            }
             Type valueType = recordTypeRegister.getTypeRegistry().get(type);
             if (valueType == null) {
                 return DorisType.STRING;
@@ -81,6 +84,9 @@ public class ArrayType extends AbstractType {
         if (sourceValue instanceof List) {
             List<Object> resultList = new ArrayList<>();
             ArrayList<?> convertedValue = (ArrayList<?>) sourceValue;
+            if (recordTypeRegister == null) {
+                registerNestedArrayType();
+            }
             Type valueType = recordTypeRegister.getTypeRegistry().get(type);
             if (valueType == null) {
                 return sourceValue;
@@ -93,5 +99,9 @@ public class ArrayType extends AbstractType {
         }
 
         return sourceValue;
+    }
+
+    private void registerNestedArrayType() {
+        this.recordTypeRegister = new RecordTypeRegister(dorisOptions);
     }
 }
