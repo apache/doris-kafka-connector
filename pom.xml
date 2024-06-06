@@ -90,6 +90,7 @@
         <jackson.version>2.13.2.1</jackson.version>
         <httpcomponents.version>4.5.13</httpcomponents.version>
         <commons-io.version>2.3</commons-io.version>
+        <geometry.version>2.2.0</geometry.version>
     </properties>
 
     <repositories>
@@ -281,6 +282,17 @@
             <groupId>io.debezium</groupId>
             <artifactId>debezium-core</artifactId>
             <version>${debezium.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.esri.geometry</groupId>
+            <artifactId>esri-geometry-api</artifactId>
+            <version>${geometry.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
