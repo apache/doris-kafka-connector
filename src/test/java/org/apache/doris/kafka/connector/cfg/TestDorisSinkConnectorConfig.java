@@ -19,10 +19,13 @@
 
 package org.apache.doris.kafka.connector.cfg;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class TestDorisSinkConnectorConfig {
@@ -48,6 +51,7 @@ public class TestDorisSinkConnectorConfig {
         config.put(
                 DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC,
                 DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC_DEFAULT + "");
+        DorisSinkConnectorConfig.setDefaultValues(config);
         return config;
     }
 
@@ -212,5 +216,78 @@ public class TestDorisSinkConnectorConfig {
         Map<String, String> config = getConfig();
         config.put(DorisSinkConnectorConfig.BUFFER_COUNT_RECORDS, "11adssadsa");
         ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test(expected = DorisException.class)
+    public void testLoadModelException() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.LOAD_MODEL, "stream_loada");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test
+    public void testLoadModel() {
+        Map<String, String> config = getConfig();
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test
+    public void testDeliveryGuarantee() {
+        Map<String, String> config = getConfig();
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test(expected = DorisException.class)
+    public void testDeliveryGuaranteeException() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.DELIVERY_GUARANTEE, "exactly_oncea");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test
+    public void testConverterMode() {
+        Map<String, String> config = getConfig();
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test(expected = DorisException.class)
+    public void testConverterModeException() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.CONVERTER_MODE, "debezium_ingestiona");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test
+    public void testSchemaEvolutionMode() {
+        Map<String, String> config = getConfig();
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test(expected = DorisException.class)
+    public void testSchemaEvolutionModeException() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION, "nonea");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test
+    public void testConvertToLowercase() {
+        Map<String, String> config = getConfig();
+        config.put("DELIVERY.guarantee", "at_least_once");
+        config.put("load.MODEL", "STREAM_LOAD");
+        config.put("DORIS.USER", "root");
+        config.put("Enable.deLete", "true");
+        config.put("doris.http.port", "8030");
+        Map<String, String> convertConfig = DorisSinkConnectorConfig.convertToLowercase(config);
+        List<String> result =
+                Arrays.asList(
+                        DorisSinkConnectorConfig.DELIVERY_GUARANTEE,
+                        DorisSinkConnectorConfig.LOAD_MODEL,
+                        DorisSinkConnectorConfig.DORIS_USER,
+                        DorisSinkConnectorConfig.ENABLE_DELETE,
+                        DorisSinkConnectorConfig.DORIS_HTTP_PORT);
+        for (String s : result) {
+            Assert.assertTrue(convertConfig.containsKey(s));
+        }
     }
 }

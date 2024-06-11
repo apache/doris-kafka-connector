@@ -37,4 +37,8 @@ public enum LoadModel {
     public static LoadModel of(String name) {
         return LoadModel.valueOf(name.toUpperCase());
     }
+
+    public static String[] instances() {
+        return new String[] {STREAM_LOAD.name, COPY_INTO.name};
+    }
 }

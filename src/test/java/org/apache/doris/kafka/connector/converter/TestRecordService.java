@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.converter.schema.SchemaChangeManager;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.model.doris.Schema;
@@ -70,6 +71,7 @@ public class TestRecordService {
                         .getClassLoader()
                         .getResourceAsStream("doris-connector-sink.properties");
         props.load(stream);
+        DorisSinkConnectorConfig.setDefaultValues((Map) props);
         props.put("task_id", "1");
         props.put("converter.mode", "debezium_ingestion");
         props.put("debezium.schema.evolution", "basic");
@@ -176,7 +178,7 @@ public class TestRecordService {
 
     @Test
     public void processStructRecord() throws IOException {
-        props.remove("converter.mode");
+        props.put("converter.mode", "normal");
         recordService = new RecordService(new DorisOptions((Map) props));
         String topic = "normal.wdl_test.test_sink_normal";
 

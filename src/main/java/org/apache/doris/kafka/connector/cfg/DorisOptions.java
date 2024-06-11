@@ -47,23 +47,23 @@ public class DorisOptions {
     private final Map<String, String> topicMap;
     private final int fileSize;
     private final int recordNum;
-    private long flushTime;
-    private boolean enableCustomJMX;
+    private final long flushTime;
+    private final boolean enableCustomJMX;
     private final int taskId;
     private final boolean enableDelete;
-    private boolean enable2PC;
+    private final boolean enable2PC;
     private boolean autoRedirect = true;
     private int requestReadTimeoutMs;
     private int requestConnectTimeoutMs;
     /** Properties for the StreamLoad. */
     private final Properties streamLoadProp = new Properties();
 
-    private String labelPrefix;
-    private String databaseTimeZone;
-    private LoadModel loadModel;
-    private DeliveryGuarantee deliveryGuarantee;
-    private ConverterMode converterMode;
-    private SchemaEvolutionMode schemaEvolutionMode;
+    @Deprecated private String labelPrefix;
+    private final String databaseTimeZone;
+    private final LoadModel loadModel;
+    private final DeliveryGuarantee deliveryGuarantee;
+    private final ConverterMode converterMode;
+    private final SchemaEvolutionMode schemaEvolutionMode;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -74,54 +74,25 @@ public class DorisOptions {
         this.password = config.get(DorisSinkConnectorConfig.DORIS_PASSWORD);
         this.database = config.get(DorisSinkConnectorConfig.DORIS_DATABASE);
         this.taskId = Integer.parseInt(config.get(ConfigCheckUtils.TASK_ID));
-        this.databaseTimeZone = DorisSinkConnectorConfig.DATABASE_TIME_ZONE_DEFAULT;
-        if (config.containsKey(DorisSinkConnectorConfig.DATABASE_TIME_ZONE)) {
-            this.databaseTimeZone = config.get(DorisSinkConnectorConfig.DATABASE_TIME_ZONE);
-        }
-        this.loadModel =
-                LoadModel.of(
-                        config.getOrDefault(
-                                DorisSinkConnectorConfig.LOAD_MODEL,
-                                DorisSinkConnectorConfig.LOAD_MODEL_DEFAULT));
+        this.databaseTimeZone = config.get(DorisSinkConnectorConfig.DATABASE_TIME_ZONE);
+        this.loadModel = LoadModel.of(config.get(DorisSinkConnectorConfig.LOAD_MODEL));
         this.deliveryGuarantee =
-                DeliveryGuarantee.of(
-                        config.getOrDefault(
-                                DorisSinkConnectorConfig.DELIVERY_GUARANTEE,
-                                DorisSinkConnectorConfig.DELIVERY_GUARANTEE_DEFAULT));
-        this.converterMode =
-                ConverterMode.of(
-                        config.getOrDefault(
-                                DorisSinkConnectorConfig.CONVERT_MODE,
-                                DorisSinkConnectorConfig.CONVERT_MODE_DEFAULT));
+                DeliveryGuarantee.of(config.get(DorisSinkConnectorConfig.DELIVERY_GUARANTEE));
+        this.converterMode = ConverterMode.of(config.get(DorisSinkConnectorConfig.CONVERTER_MODE));
         this.schemaEvolutionMode =
                 SchemaEvolutionMode.of(
-                        config.getOrDefault(
-                                DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION,
-                                DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION_DEFAULT));
-
+                        config.get(DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION));
         this.fileSize = Integer.parseInt(config.get(DorisSinkConnectorConfig.BUFFER_SIZE_BYTES));
         this.recordNum =
                 Integer.parseInt(config.get(DorisSinkConnectorConfig.BUFFER_COUNT_RECORDS));
 
         this.flushTime = Long.parseLong(config.get(DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC));
-        if (flushTime < DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC_MIN) {
-            LOG.warn(
-                    "flush time is {} seconds, it is smaller than the minimum flush time {} seconds, reset to the minimum flush time",
-                    flushTime,
-                    DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC_MIN);
-            this.flushTime = DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC_MIN;
-        }
         this.topicMap = getTopicToTableMap(config);
 
-        this.enable2PC = DorisSinkConnectorConfig.ENABLE_2PC_DEFAULT;
-        if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
-            this.enable2PC = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC));
-        }
-        enableCustomJMX = DorisSinkConnectorConfig.JMX_OPT_DEFAULT;
-        if (config.containsKey(DorisSinkConnectorConfig.JMX_OPT)) {
-            enableCustomJMX = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.JMX_OPT));
-        }
-        enableDelete = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_DELETE));
+        this.enable2PC = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC));
+        this.enableCustomJMX = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.JMX_OPT));
+        this.enableDelete =
+                Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_DELETE));
         this.requestConnectTimeoutMs =
                 DorisSinkConnectorConfig.DORIS_REQUEST_CONNECT_TIMEOUT_MS_DEFAULT;
         this.requestReadTimeoutMs = DorisSinkConnectorConfig.DORIS_REQUEST_READ_TIMEOUT_MS_DEFAULT;

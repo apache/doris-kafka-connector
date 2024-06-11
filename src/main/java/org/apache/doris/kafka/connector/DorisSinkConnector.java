@@ -52,9 +52,8 @@ public class DorisSinkConnector extends SinkConnector {
     @Override
     public void start(final Map<String, String> parsedConfig) {
         LOG.info("doris sink connector start");
-        config = new HashMap<>(parsedConfig);
+        config = DorisSinkConnectorConfig.convertToLowercase(parsedConfig);
         DorisSinkConnectorConfig.setDefaultValues(config);
-
         ConfigCheckUtils.validateConfig(config);
     }
 

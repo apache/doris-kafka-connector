@@ -37,4 +37,8 @@ public enum DeliveryGuarantee {
     public String getName() {
         return name;
     }
+
+    public static String[] instances() {
+        return new String[] {EXACTLY_ONCE.name, AT_LEAST_ONCE.name};
+    }
 }

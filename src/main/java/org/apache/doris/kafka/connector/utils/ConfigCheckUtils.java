@@ -23,8 +23,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.doris.kafka.connector.converter.ConverterMode;
+import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
 import org.apache.doris.kafka.connector.exception.ArgumentsException;
 import org.apache.doris.kafka.connector.exception.DorisException;
+import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
+import org.apache.doris.kafka.connector.writer.load.LoadModel;
 import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigValue;
 import org.slf4j.Logger;
@@ -136,6 +140,42 @@ public class ConfigCheckUtils {
             LOG.error(
                     "{} cannot be empty or not a number or less than 10.",
                     DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC);
+            configIsValid = false;
+        }
+
+        String loadModel = config.get(DorisSinkConnectorConfig.LOAD_MODEL);
+        if (!validateEnumInstances(loadModel, LoadModel.instances())) {
+            LOG.error(
+                    "The value of {} is an illegal parameter of {}.",
+                    loadModel,
+                    DorisSinkConnectorConfig.LOAD_MODEL);
+            configIsValid = false;
+        }
+
+        String deliveryGuarantee = config.get(DorisSinkConnectorConfig.DELIVERY_GUARANTEE);
+        if (!validateEnumInstances(deliveryGuarantee, DeliveryGuarantee.instances())) {
+            LOG.error(
+                    "The value of {} is an illegal parameter of {}.",
+                    loadModel,
+                    DorisSinkConnectorConfig.DELIVERY_GUARANTEE);
+            configIsValid = false;
+        }
+
+        String converterMode = config.get(DorisSinkConnectorConfig.CONVERTER_MODE);
+        if (!validateEnumInstances(converterMode, ConverterMode.instances())) {
+            LOG.error(
+                    "The value of {} is an illegal parameter of {}.",
+                    loadModel,
+                    DorisSinkConnectorConfig.CONVERTER_MODE);
+            configIsValid = false;
+        }
+
+        String schemaEvolutionMode = config.get(DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION);
+        if (!validateEnumInstances(schemaEvolutionMode, SchemaEvolutionMode.instances())) {
+            LOG.error(
+                    "The value of {} is an illegal parameter of {}.",
+                    loadModel,
+                    DorisSinkConnectorConfig.DEBEZIUM_SCHEMA_EVOLUTION);
             configIsValid = false;
         }
 
@@ -253,5 +293,14 @@ public class ConfigCheckUtils {
     /** validates that table name is a valid table identifier */
     private static boolean isValidTableIdentifier(String tblName) {
         return tblName.matches("^[a-zA-Z][a-zA-Z0-9_]*$");
+    }
+
+    private static boolean validateEnumInstances(String value, String[] instances) {
+        for (String instance : instances) {
+            if (instance.equalsIgnoreCase(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

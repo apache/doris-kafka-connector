@@ -38,4 +38,8 @@ public enum ConverterMode {
     public String getName() {
         return name;
     }
+
+    public static String[] instances() {
+        return new String[] {NORMAL.name, DEBEZIUM_INGESTION.name};
+    }
 }
