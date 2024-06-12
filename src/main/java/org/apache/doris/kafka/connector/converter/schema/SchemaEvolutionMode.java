@@ -37,4 +37,8 @@ public enum SchemaEvolutionMode {
     public String getName() {
         return name;
     }
+
+    public static String[] instances() {
+        return new String[] {NONE.name, BASIC.name};
+    }
 }

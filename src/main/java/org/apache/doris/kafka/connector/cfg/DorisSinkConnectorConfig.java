@@ -20,6 +20,8 @@
 package org.apache.doris.kafka.connector.cfg;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.doris.kafka.connector.DorisSinkConnector;
 import org.apache.doris.kafka.connector.converter.ConverterMode;
@@ -77,7 +79,7 @@ public class DorisSinkConnectorConfig {
     public static final String AUTO_REDIRECT = "auto.redirect";
     public static final String DELIVERY_GUARANTEE = "delivery.guarantee";
     public static final String DELIVERY_GUARANTEE_DEFAULT = DeliveryGuarantee.AT_LEAST_ONCE.name();
-    public static final String CONVERT_MODE = "converter.mode";
+    public static final String CONVERTER_MODE = "converter.mode";
     public static final String CONVERT_MODE_DEFAULT = ConverterMode.NORMAL.getName();
 
     // Prefix for Doris StreamLoad specific properties.
@@ -100,15 +102,37 @@ public class DorisSinkConnectorConfig {
     private static final ConfigDef.Validator topicToTableValidator = new TopicToTableValidator();
 
     public static void setDefaultValues(Map<String, String> config) {
-        setFieldToDefaultValues(config, BUFFER_COUNT_RECORDS, BUFFER_COUNT_RECORDS_DEFAULT);
-        setFieldToDefaultValues(config, BUFFER_SIZE_BYTES, BUFFER_SIZE_BYTES_DEFAULT);
-        setFieldToDefaultValues(config, BUFFER_FLUSH_TIME_SEC, BUFFER_FLUSH_TIME_SEC_DEFAULT);
+        setFieldToDefaultValues(
+                config, BUFFER_COUNT_RECORDS, String.valueOf(BUFFER_COUNT_RECORDS_DEFAULT));
+        setFieldToDefaultValues(
+                config, BUFFER_SIZE_BYTES, String.valueOf(BUFFER_SIZE_BYTES_DEFAULT));
+        setFieldToDefaultValues(
+                config, BUFFER_FLUSH_TIME_SEC, String.valueOf(BUFFER_FLUSH_TIME_SEC_DEFAULT));
+        setFieldToDefaultValues(config, DATABASE_TIME_ZONE, DATABASE_TIME_ZONE_DEFAULT);
+        setFieldToDefaultValues(config, LOAD_MODEL, LOAD_MODEL_DEFAULT);
+        setFieldToDefaultValues(config, DELIVERY_GUARANTEE, DELIVERY_GUARANTEE_DEFAULT);
+        setFieldToDefaultValues(config, CONVERTER_MODE, CONVERT_MODE_DEFAULT);
+        setFieldToDefaultValues(
+                config, DEBEZIUM_SCHEMA_EVOLUTION, DEBEZIUM_SCHEMA_EVOLUTION_DEFAULT);
+        setFieldToDefaultValues(config, ENABLE_2PC, String.valueOf(ENABLE_2PC_DEFAULT));
+        setFieldToDefaultValues(config, JMX_OPT, String.valueOf(JMX_OPT_DEFAULT));
     }
 
-    static void setFieldToDefaultValues(Map<String, String> config, String field, Long value) {
+    public static Map<String, String> convertToLowercase(Map<String, String> config) {
+        Map<String, String> newConfig = new HashMap<>();
+        for (Map.Entry<String, String> configEntry : config.entrySet()) {
+            String key = configEntry.getKey();
+            String value = configEntry.getValue();
+            newConfig.put(key.toLowerCase(Locale.ROOT), value);
+        }
+        return newConfig;
+    }
+
+    private static void setFieldToDefaultValues(
+            Map<String, String> config, String field, String value) {
         if (!config.containsKey(field)) {
-            config.put(field, value + "");
-            LOG.info("{} set to default {} seconds", field, value);
+            config.put(field, value);
+            LOG.info("Set the default value of {} to {}", field, value);
         }
     }
 

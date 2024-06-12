@@ -45,6 +45,7 @@ public class TestDorisOptions {
         props = new Properties();
         props.load(stream);
         props.put("task_id", "1");
+        DorisSinkConnectorConfig.setDefaultValues((Map) props);
     }
 
     @Test

@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.exception.CopyLoadException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
@@ -59,6 +60,7 @@ public class TestCopyIntoWriter {
                         .getResourceAsStream("doris-connector-sink.properties");
         Properties props = new Properties();
         props.load(stream);
+        DorisSinkConnectorConfig.setDefaultValues((Map) props);
         props.put("task_id", "1");
         props.put("name", "connect-test-sink299");
         props.put("load.model", "copy_into");

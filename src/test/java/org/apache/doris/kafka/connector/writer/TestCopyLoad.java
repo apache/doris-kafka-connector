@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.writer.load.CopyLoad;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -49,6 +50,7 @@ public class TestCopyLoad {
         Properties props = new Properties();
         props.load(stream);
         props.put("task_id", "1");
+        DorisSinkConnectorConfig.setDefaultValues((Map) props);
         options = new DorisOptions((Map) props);
     }
 
