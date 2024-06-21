@@ -315,13 +315,6 @@ public class TestRecordService {
                 new ObjectMapper().writeValueAsString(objectNode));
     }
 
-    @Test
-    public void processStringRecord() {
-        SinkRecord record = TestRecordBuffer.newSinkRecord("doris", 1);
-        String s = recordService.processStringRecord(record);
-        Assert.assertEquals("doris", s);
-    }
-
     @After
     public void close() {
         mockRestService.close();

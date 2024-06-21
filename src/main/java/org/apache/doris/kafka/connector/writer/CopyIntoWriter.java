@@ -78,7 +78,7 @@ public class CopyIntoWriter extends DorisWriter {
         final String SQL_TEMPLATE =
                 "SHOW COPY FROM %s WHERE TABLENAME = '%s' AND STATE = 'FINISHED' AND FILES LIKE '%%%s%%' ORDER BY CREATETIME DESC LIMIT 100";
         final String filePrefix =
-                FileNameUtils.getFilePrefix(dorisOptions.getName(), topic, partition);
+                FileNameUtils.filePrefix(dorisOptions.getName(), topic, partition);
         String offsetQuery = String.format(SQL_TEMPLATE, dbName, tableName, filePrefix);
         LOG.info("query offset by sql: {}", offsetQuery);
         List<String> loadFileList = new ArrayList<>();

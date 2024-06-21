@@ -119,12 +119,12 @@ public class DorisSinkTask extends SinkTask {
     @Override
     public Map<TopicPartition, OffsetAndMetadata> preCommit(
             Map<TopicPartition, OffsetAndMetadata> offsets) throws RetriableException {
-
-        sink.commit(offsets);
         // return an empty map means that offset commitment is not desired
         if (sink == null || sink.getPartitionCount() == 0) {
             return new HashMap<>();
         }
+
+        sink.commit(offsets);
         Map<TopicPartition, OffsetAndMetadata> committedOffsets = new HashMap<>();
         // it's ok to just log the error since commit can retry
         try {

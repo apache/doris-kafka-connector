@@ -262,11 +262,6 @@ public class RecordService {
         }
     }
 
-    /** If not struct, map, list, use the default string */
-    public String processStringRecord(SinkRecord record) {
-        return record.value().toString();
-    }
-
     private String parseFieldValues(
             RecordDescriptor record, Struct source, List<String> fields, boolean isDelete) {
         Map<String, Object> filedMapping = new LinkedHashMap<>();
