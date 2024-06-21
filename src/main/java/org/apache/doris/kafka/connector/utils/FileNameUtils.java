@@ -65,17 +65,8 @@ public class FileNameUtils {
      */
     public static boolean verifyFileName(
             String name, String topic, int partition, String fileName) {
-        String prefix = getFilePrefix(name, topic, partition);
+        String prefix = filePrefix(name, topic, partition);
         return fileName.startsWith(prefix);
-    }
-
-    public static String getFilePrefix(String name, String topic, int partition) {
-        return name
-                + LoadConstants.FILE_DELIM_DEFAULT
-                + topic
-                + LoadConstants.FILE_DELIM_DEFAULT
-                + partition
-                + LoadConstants.FILE_DELIM_DEFAULT;
     }
 
     /**

@@ -29,8 +29,6 @@ import org.apache.doris.kafka.connector.exception.ArgumentsException;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
-import org.apache.kafka.common.config.Config;
-import org.apache.kafka.common.config.ConfigValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -267,14 +265,6 @@ public class ConfigCheckUtils {
             throw new DorisException("Failed to parse topic2table map");
         }
         return topic2Table;
-    }
-
-    public static Map<String, ConfigValue> validateConfigToMap(final Config result) {
-        Map<String, ConfigValue> validateMap = new HashMap<>();
-        for (ConfigValue v : result.configValues()) {
-            validateMap.put(v.name(), v);
-        }
-        return validateMap;
     }
 
     private static boolean isNumeric(String str) {

@@ -21,8 +21,6 @@ package org.apache.doris.kafka.connector.utils;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.DorisException;
@@ -39,29 +37,6 @@ public class BackendUtils {
     public BackendUtils(List<BackendV2.BackendRowV2> backends) {
         this.backends = backends;
         this.pos = 0;
-    }
-
-    public BackendUtils(String beNodes) {
-        this.backends = initBackends(beNodes);
-        this.pos = 0;
-    }
-
-    private List<BackendV2.BackendRowV2> initBackends(String beNodes) {
-        List<BackendV2.BackendRowV2> backends = new ArrayList<>();
-        List<String> nodes = Arrays.asList(beNodes.split(","));
-        nodes.forEach(
-                node -> {
-                    if (tryHttpConnection(node)) {
-                        node = node.trim();
-                        String[] ipAndPort = node.split(":");
-                        BackendV2.BackendRowV2 backendRowV2 = new BackendV2.BackendRowV2();
-                        backendRowV2.setIp(ipAndPort[0]);
-                        backendRowV2.setHttpPort(Integer.parseInt(ipAndPort[1]));
-                        backendRowV2.setAlive(true);
-                        backends.add(backendRowV2);
-                    }
-                });
-        return backends;
     }
 
     public static BackendUtils getInstance(DorisOptions dorisOptions, Logger logger) {

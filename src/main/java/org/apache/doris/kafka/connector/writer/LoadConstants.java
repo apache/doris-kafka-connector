@@ -21,7 +21,6 @@ package org.apache.doris.kafka.connector.writer;
 
 public class LoadConstants {
     public static final String DORIS_DELETE_SIGN = "__DORIS_DELETE_SIGN__";
-    public static final String DELETE_KET = "__deleted";
     public static final String DORIS_DEL_TRUE = "1";
     public static final String DORIS_DEL_FALSE = "0";
 

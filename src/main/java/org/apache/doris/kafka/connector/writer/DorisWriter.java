@@ -58,7 +58,6 @@ public abstract class DorisWriter {
     protected RecordService recordService;
     protected int taskId;
     protected final DorisConnectMonitor connectMonitor;
-    protected boolean schemaChange;
 
     public DorisWriter(
             String topic,
