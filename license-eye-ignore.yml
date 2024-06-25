@@ -15,26 +15,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
----
-name: License Check
-on:
-  pull_request:
-  push:
-    branches:
-      - master
 
-jobs:
-  license-check:
-    name: "License Check"
-    runs-on: ubuntu-latest
-    steps:
-      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
-        uses: actions/checkout@v2
-
-      - name: Check License
-        uses: apache/skywalking-eyes@v0.2.0
-        with:
-          config-path: ./license-eye-ignore.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+license:
+  ignore_paths:
+    - src/test/resources/decode/avro/user.avsc
+    - src/test/resources/decode/avro/product.avsc
