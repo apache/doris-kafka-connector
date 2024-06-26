@@ -27,7 +27,6 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.avro.Conversions;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
@@ -50,7 +49,6 @@ import org.slf4j.LoggerFactory;
  */
 public class DorisAvroConverter extends DorisConverter {
     public static final String AVRO_TOPIC_SCHEMA_FILEPATH = "avro.topic2schema.filepath";
-    public static final String AVRO_CONVERTER_TEST = "avro.converter.test";
     private static final Logger LOG = LoggerFactory.getLogger(DorisAvroConverter.class);
     private final Map<String, Schema> topic2SchemaMap = new HashMap<>();
 
@@ -74,22 +72,9 @@ public class DorisAvroConverter extends DorisConverter {
             for (Map.Entry<String, String> entry : topic2SchemaFileMap.entrySet()) {
                 String topic = entry.getKey();
                 String schemaPath = entry.getValue();
-                Schema schema = null;
+                Schema schema;
                 try {
-                    if (configs.containsKey(AVRO_CONVERTER_TEST)) {
-                        // Used for junit testing to load resource files
-                        if (Boolean.parseBoolean((String) configs.get(AVRO_CONVERTER_TEST))) {
-                            String resourcePath =
-                                    Objects.requireNonNull(
-                                                    this.getClass()
-                                                            .getClassLoader()
-                                                            .getResource(schemaPath))
-                                            .getPath();
-                            schema = new Schema.Parser().parse(new File(resourcePath));
-                        }
-                    } else {
-                        schema = new Schema.Parser().parse(new File(schemaPath));
-                    }
+                    schema = new Schema.Parser().parse(new File(schemaPath));
                 } catch (SchemaParseException | IOException e) {
                     LOG.error(
                             "the provided for "
@@ -189,7 +174,7 @@ public class DorisAvroConverter extends DorisConverter {
      *
      * @param data avro data
      * @param writerSchema avro schema with which data got serialized
-     * @param readerSchema avro schema that describes the shape of the returned JsonNode
+     * @param readerSchema avro schema with which will to be read and returned
      */
     private String parseAvroWithSchema(final byte[] data, Schema writerSchema, Schema readerSchema)
             throws IOException {

@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.avro.Schema;
 import org.junit.Assert;
 import org.junit.Before;
@@ -32,8 +31,8 @@ import org.junit.Test;
 public class DorisAvroConverterTest {
     private static final String USER_TOPIC = "user-topic";
     private static final String PRODUCT_TOPIC = "product-topic";
-    private static final String USER_AVRO_PATH = "decode/avro/user.avsc";
-    private static final String PRODUCT_AVRO_PATH = "decode/avro/product.avsc";
+    private static final String USER_AVRO_PATH = "src/test/resources/decode/avro/user.avsc";
+    private static final String PRODUCT_AVRO_PATH = "src/test/resources/decode/avro/product.avsc";
     private final DorisAvroConverter avroConverter = new DorisAvroConverter();
     private final Map<String, String> configs = new HashMap<>();
 
@@ -48,7 +47,6 @@ public class DorisAvroConverterTest {
                         + ":file://"
                         + PRODUCT_AVRO_PATH;
         configs.put(DorisAvroConverter.AVRO_TOPIC_SCHEMA_FILEPATH, topic2SchemaPath);
-        configs.put(DorisAvroConverter.AVRO_CONVERTER_TEST, "true");
     }
 
     @Test
@@ -59,15 +57,8 @@ public class DorisAvroConverterTest {
         Assert.assertTrue(topic2SchemaMap.containsKey(USER_TOPIC));
         Assert.assertTrue(topic2SchemaMap.containsKey(PRODUCT_TOPIC));
 
-        String userPath =
-                Objects.requireNonNull(this.getClass().getClassLoader().getResource(USER_AVRO_PATH))
-                        .getPath();
-        String productPath =
-                Objects.requireNonNull(
-                                this.getClass().getClassLoader().getResource(PRODUCT_AVRO_PATH))
-                        .getPath();
-        Schema productSchema = new Schema.Parser().parse(new File(productPath));
-        Schema userSchema = new Schema.Parser().parse(new File(userPath));
+        Schema productSchema = new Schema.Parser().parse(new File(PRODUCT_AVRO_PATH));
+        Schema userSchema = new Schema.Parser().parse(new File(USER_AVRO_PATH));
         Assert.assertEquals(topic2SchemaMap.get(USER_TOPIC), userSchema);
         Assert.assertEquals(topic2SchemaMap.get(PRODUCT_TOPIC), productSchema);
     }
