@@ -35,6 +35,6 @@ jobs:
       - name: Check License
         uses: apache/skywalking-eyes@v0.2.0
         with:
-          config-path: ./license-eye-ignore.yml
+          config-path: ./.licenserc.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
