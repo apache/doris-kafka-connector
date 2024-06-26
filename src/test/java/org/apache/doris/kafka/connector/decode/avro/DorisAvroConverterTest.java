@@ -19,11 +19,18 @@
 
 package org.apache.doris.kafka.connector.decode.avro;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.DatumWriter;
+import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.specific.SpecificDatumWriter;
+import org.apache.kafka.connect.data.SchemaAndValue;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,6 +42,7 @@ public class DorisAvroConverterTest {
     private static final String PRODUCT_AVRO_PATH = "src/test/resources/decode/avro/product.avsc";
     private final DorisAvroConverter avroConverter = new DorisAvroConverter();
     private final Map<String, String> configs = new HashMap<>();
+    private final List<byte[]> records = new ArrayList<>();
 
     @Before
     public void init() {
@@ -61,5 +69,29 @@ public class DorisAvroConverterTest {
         Schema userSchema = new Schema.Parser().parse(new File(USER_AVRO_PATH));
         Assert.assertEquals(topic2SchemaMap.get(USER_TOPIC), userSchema);
         Assert.assertEquals(topic2SchemaMap.get(PRODUCT_TOPIC), productSchema);
+    }
+
+    @Test
+    public void testConvert() throws IOException {
+        Schema userSchema = new Schema.Parser().parse(new File(USER_AVRO_PATH));
+        byte[] userAvroData = generateUserRecord(userSchema);
+        avroConverter.parseTopic2Schema(configs);
+        SchemaAndValue schemaAndValue = avroConverter.toConnectData("user-topic", userAvroData);
+        Object o = schemaAndValue.value();
+
+        Assert.assertEquals(o, "{\"id\": 1, \"name\": \"test\", \"age\": 18}");
+    }
+
+    private byte[] generateUserRecord(Schema userSchema) throws IOException {
+        GenericData.Record userRecord = new GenericData.Record(userSchema);
+        userRecord.put("id", 1);
+        userRecord.put("name", "test");
+        userRecord.put("age", 18);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(outputStream, null);
+        DatumWriter<GenericRecord> writer = new SpecificDatumWriter<GenericRecord>(userSchema);
+        writer.write(userRecord, encoder);
+        encoder.flush();
+        return outputStream.toByteArray();
     }
 }
