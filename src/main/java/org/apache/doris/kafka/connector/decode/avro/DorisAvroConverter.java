@@ -147,11 +147,7 @@ public class DorisAvroConverter extends DorisConverter {
         if (topic2SchemaMap.containsKey(topic)) {
             Schema schema = topic2SchemaMap.get(topic);
             ByteBuffer buffer = ByteBuffer.wrap(value);
-            if (buffer.get() != 0) {
-                throw new DataDecodeException("Input record value can't be parsed.");
-            }
-            int id = buffer.getInt();
-            int length = buffer.limit() - 1 - 4;
+            int length = buffer.limit();
             byte[] data = new byte[length];
             buffer.get(data, 0, length);
             try {

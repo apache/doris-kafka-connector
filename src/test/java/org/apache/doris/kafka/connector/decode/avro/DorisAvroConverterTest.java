@@ -42,7 +42,6 @@ public class DorisAvroConverterTest {
     private static final String PRODUCT_AVRO_PATH = "src/test/resources/decode/avro/product.avsc";
     private final DorisAvroConverter avroConverter = new DorisAvroConverter();
     private final Map<String, String> configs = new HashMap<>();
-    private final List<byte[]> records = new ArrayList<>();
 
     @Before
     public void init() {
