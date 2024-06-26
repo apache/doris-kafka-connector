@@ -15,26 +15,15 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
----
-name: License Check
-on:
-  pull_request:
-  push:
-    branches:
-      - master
 
-jobs:
-  license-check:
-    name: "License Check"
-    runs-on: ubuntu-latest
-    steps:
-      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
-        uses: actions/checkout@v2
+header:
+  license:
+    spdx-id: Apache-2.0
+    copyright-owner: Apache Software Foundation
 
-      - name: Check License
-        uses: apache/skywalking-eyes@v0.2.0
-        with:
-          config-path: ./.licenserc.yaml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  paths-ignore:
+    - 'LICENSE'
+    - '.gitignore'
+    - 'src/test/resources/decode/avro/**'
+
+  comment: on-failure
