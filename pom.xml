@@ -91,6 +91,7 @@
         <httpcomponents.version>4.5.13</httpcomponents.version>
         <commons-io.version>2.3</commons-io.version>
         <geometry.version>2.2.0</geometry.version>
+        <testcontainers.version>1.17.6</testcontainers.version>
     </properties>
 
     <repositories>
@@ -294,6 +295,18 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -421,6 +434,17 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- When using mvn to build a project, ignore packages under specific paths-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.2</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/org/apache/doris/kafka/connector/e2e/**</exclude>
+                    </excludes>
+                </configuration>
             </plugin>
         </plugins>
     </build>

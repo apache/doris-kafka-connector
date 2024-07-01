@@ -15,16 +15,30 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+#
+---
+name: E2E Test CI
+on:
+  pull_request:
+  push:
 
-header:
-  license:
-    spdx-id: Apache-2.0
-    copyright-owner: Apache Software Foundation
+jobs:
+  build-extension:
+    name: "e2e test case"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
 
-  paths-ignore:
-    - 'LICENSE'
-    - '.gitignore'
-    - 'src/test/resources/decode/avro/**'
-    - 'src/test/resources/e2e/**'
+      - name: Setup java
+        uses: actions/setup-java@v2
+        with:
+          distribution: adopt
+          java-version: '8'
 
-  comment: on-failure
+      - name: Doris E2E Test
+        run: |
+          mvn test -Dtest='org.apache.doris.kafka.connector.e2e.**'
