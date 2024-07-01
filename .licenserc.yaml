@@ -25,6 +25,6 @@ header:
     - 'LICENSE'
     - '.gitignore'
     - 'src/test/resources/decode/avro/**'
-    - 'src/test/resources/e2e/string_msg/**'
+    - 'src/test/resources/e2e/**'
 
   comment: on-failure
