@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.doris.kafka.connector.e2e.sink.string;
+package org.apache.doris.kafka.connector.e2e.sink.stringconverter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
@@ -49,7 +49,7 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
 
     public static void initialize() {
         jsonMsgConnectorContent =
-                loadContent("src/test/resources/e2e/string_msg/string_msg_connector.json");
+                loadContent("src/test/resources/e2e/string_converter/string_msg_connector.json");
         JsonNode rootNode = null;
         try {
             rootNode = objectMapper.readTree(jsonMsgConnectorContent);
@@ -74,7 +74,7 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         String msg = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
 
         produceMsg2Kafka(topic, msg);
-        String tableSql = loadContent("src/test/resources/e2e/string_msg/string_msg_tab.sql");
+        String tableSql = loadContent("src/test/resources/e2e/string_converter/string_msg_tab.sql");
         createTable(tableSql);
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
 

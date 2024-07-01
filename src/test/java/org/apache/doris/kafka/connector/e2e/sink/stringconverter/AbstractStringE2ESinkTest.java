@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.doris.kafka.connector.e2e.sink.string;
+package org.apache.doris.kafka.connector.e2e.sink.stringconverter;
 
 import java.util.Objects;
 import java.util.Properties;
