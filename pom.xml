@@ -435,6 +435,7 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- When using mvn to build a project, ignore packages under specific paths-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

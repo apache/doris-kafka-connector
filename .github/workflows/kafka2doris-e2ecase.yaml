@@ -19,7 +19,6 @@
 ---
 name: E2E Test CI
 on:
-  pull_request:
   push:
 
 jobs:
