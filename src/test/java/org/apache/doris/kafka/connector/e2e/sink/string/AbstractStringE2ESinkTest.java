@@ -29,6 +29,11 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Produce messages using the {@link org.apache.kafka.common.serialization.StringSerializer}
+ * serializer, Use the {@link org.apache.kafka.connect.storage.StringConverter} converter to consume
+ * messages.
+ */
 public abstract class AbstractStringE2ESinkTest extends AbstractKafka2DorisSink {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractStringE2ESinkTest.class);
     private static KafkaProducer<String, String> producer;
