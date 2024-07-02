@@ -5,7 +5,7 @@
     "topics":"string_test",
     "tasks.max":"1",
     "doris.topic2table.map": "string_test:string_msg_tab",
-    "buffer.count.records":"10",
+    "buffer.count.records":"1",
     "buffer.flush.time":"120",
     "buffer.size.bytes":"10000000",
     "doris.urls":"127.0.0.1",
