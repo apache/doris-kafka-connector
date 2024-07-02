@@ -33,8 +33,11 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
+    private static final Logger LOG = LoggerFactory.getLogger(StringMsgE2ETest.class);
     private static String connectorName;
     private static String jsonMsgConnectorContent;
     private static DorisOptions dorisOptions;
@@ -80,11 +83,13 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
 
         String table = dorisOptions.getTopicMapTable(topic);
         Statement statement = getJdbcConnection().createStatement();
-        ResultSet resultSet = statement.executeQuery("select * from " + database + "." + table);
+        String querySql = "select * from " + database + "." + table;
+        LOG.info("start to query result from doris. sql={}", querySql);
+        ResultSet resultSet = statement.executeQuery(querySql);
         if (resultSet.next()) {
             Assert.assertEquals(1, resultSet.getString("id"));
             Assert.assertEquals("zhangsan", resultSet.getString("name"));
-            Assert.assertEquals(12, resultSet.getString("12"));
+            Assert.assertEquals(12, resultSet.getString("ager"));
         }
     }
 
