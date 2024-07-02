@@ -70,7 +70,7 @@ public class TestCopyIntoWriter {
     public void fetchOffset() {
         dorisWriter = mockCopyIntoWriter(new String[] {});
         dorisWriter.fetchOffset();
-        Assert.assertEquals(-1, dorisWriter.getOffsetPersistedInDoris().longValue());
+        Assert.assertEquals(-1l, dorisWriter.getOffsetPersistedInDoris().longValue());
     }
 
     private CopyIntoWriter mockCopyIntoWriter(String[] listLoadFiles) {
