@@ -37,7 +37,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class GroupCommite2eTest extends AbstractStringE2ESinkTest {
+public class GroupCommitE2ETest extends AbstractStringE2ESinkTest {
     private static String connectorName;
     private static String jsonMsgConnectorContent;
     private static DorisOptions dorisOptions;
