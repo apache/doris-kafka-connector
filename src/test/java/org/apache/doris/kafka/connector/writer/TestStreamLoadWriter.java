@@ -36,7 +36,6 @@ import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
-import org.apache.doris.kafka.connector.exception.StreamLoadException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.writer.commit.DorisCommittable;
 import org.apache.doris.kafka.connector.writer.load.DorisStreamLoad;
@@ -82,22 +81,14 @@ public class TestStreamLoadWriter {
                 "VISIBLE");
     }
 
-    @Test(expected = StreamLoadException.class)
+    @Test
     public void fetchOffset() {
-        DorisConnectMonitor dorisConnectMonitor = mock(DorisConnectMonitor.class);
-        dorisWriter =
-                new StreamLoadWriter(
-                        "avro-complex10",
-                        2,
-                        dorisOptions,
-                        new JdbcConnectionProvider(dorisOptions),
-                        dorisConnectMonitor);
+        dorisWriter = mockStreamLoadWriter(new HashMap<>());
         dorisWriter.fetchOffset();
         Assert.assertEquals(-1l, dorisWriter.getOffsetPersistedInDoris().longValue());
     }
 
-    @Test
-    public void fetchOffsetTest() {
+    private StreamLoadWriter mockStreamLoadWriter(Map<String, String> label2Status) {
         DorisConnectMonitor dorisConnectMonitor = mock(DorisConnectMonitor.class);
         StreamLoadWriter streamLoadWriter =
                 spy(
@@ -109,8 +100,12 @@ public class TestStreamLoadWriter {
                                 dorisConnectMonitor));
 
         doReturn(label2Status).when(streamLoadWriter).fetchLabel2Status();
-        dorisWriter = streamLoadWriter;
+        return streamLoadWriter;
+    }
 
+    @Test
+    public void fetchOffsetTest() {
+        dorisWriter = mockStreamLoadWriter(label2Status);
         dorisWriter.fetchOffset();
         System.out.println(dorisWriter.getOffsetPersistedInDoris().longValue());
         Assert.assertEquals(832, dorisWriter.getOffsetPersistedInDoris().longValue());
