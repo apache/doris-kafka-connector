@@ -33,8 +33,11 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
+    private static final Logger LOG = LoggerFactory.getLogger(StringMsgE2ETest.class);
     private static String connectorName;
     private static String jsonMsgConnectorContent;
     private static DorisOptions dorisOptions;
@@ -80,12 +83,20 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
 
         String table = dorisOptions.getTopicMapTable(topic);
         Statement statement = getJdbcConnection().createStatement();
-        ResultSet resultSet = statement.executeQuery("select * from " + database + "." + table);
-        if (resultSet.next()) {
-            Assert.assertEquals(1, resultSet.getString("id"));
-            Assert.assertEquals("zhangsan", resultSet.getString("name"));
-            Assert.assertEquals(12, resultSet.getString("12"));
-        }
+        String querySql = "select * from " + database + "." + table;
+        LOG.info("start to query result from doris. sql={}", querySql);
+        ResultSet resultSet = statement.executeQuery(querySql);
+
+        Assert.assertTrue(resultSet.next());
+
+        int id = resultSet.getInt("id");
+        String name = resultSet.getString("name");
+        int age = resultSet.getInt("age");
+        LOG.info("Query result is id={}, name={}, age={}", id, name, age);
+
+        Assert.assertEquals(1, id);
+        Assert.assertEquals("zhangsan", name);
+        Assert.assertEquals(12, age);
     }
 
     @AfterClass
