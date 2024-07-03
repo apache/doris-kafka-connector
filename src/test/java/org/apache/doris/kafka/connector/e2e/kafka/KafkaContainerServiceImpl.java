@@ -214,7 +214,7 @@ public class KafkaContainerServiceImpl implements KafkaContainerService {
 
         // The current thread sleeps for 10 seconds so that connect can consume messages to doris in
         // time.
-        Thread.sleep(10000);
+        Thread.sleep(60000);
     }
 
     @Override

@@ -32,7 +32,6 @@ import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
-import org.apache.doris.kafka.connector.exception.CopyLoadException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.writer.load.CopyLoad;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -67,22 +66,14 @@ public class TestCopyIntoWriter {
         dorisOptions = new DorisOptions((Map) props);
     }
 
-    @Test(expected = CopyLoadException.class)
+    @Test
     public void fetchOffset() {
-        DorisConnectMonitor dorisConnectMonitor = mock(DorisConnectMonitor.class);
-        dorisWriter =
-                new CopyIntoWriter(
-                        "test5",
-                        0,
-                        dorisOptions,
-                        new JdbcConnectionProvider(dorisOptions),
-                        dorisConnectMonitor);
+        dorisWriter = mockCopyIntoWriter(new String[] {});
         dorisWriter.fetchOffset();
         Assert.assertEquals(-1l, dorisWriter.getOffsetPersistedInDoris().longValue());
     }
 
-    @Test
-    public void fetchOffsetTest() {
+    private CopyIntoWriter mockCopyIntoWriter(String[] listLoadFiles) {
         DorisConnectMonitor dorisConnectMonitor = mock(DorisConnectMonitor.class);
         CopyIntoWriter copyIntoWriter =
                 spy(
@@ -93,7 +84,12 @@ public class TestCopyIntoWriter {
                                 new JdbcConnectionProvider(dorisOptions),
                                 dorisConnectMonitor));
         doReturn(Arrays.asList(listLoadFiles)).when(copyIntoWriter).listLoadFiles();
-        dorisWriter = copyIntoWriter;
+        return copyIntoWriter;
+    }
+
+    @Test
+    public void fetchOffsetTest() {
+        dorisWriter = mockCopyIntoWriter(listLoadFiles);
         dorisWriter.fetchOffset();
         System.out.println(dorisWriter.getOffsetPersistedInDoris().longValue());
         Assert.assertEquals(168172036, dorisWriter.getOffsetPersistedInDoris().longValue());
