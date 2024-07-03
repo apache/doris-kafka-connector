@@ -21,10 +21,7 @@ package org.apache.doris.kafka.connector.converter.type.debezium;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTimestamp;
 import java.time.LocalDateTime;
-import org.apache.doris.kafka.connector.converter.type.doris.DorisType;
-import org.apache.doris.kafka.connector.converter.type.doris.DorisTypeProperties;
 import org.apache.doris.kafka.connector.converter.type.util.DateTimeUtils;
-import org.apache.kafka.connect.data.Schema;
 
 /**
  * An implementation of {@link org.apache.doris.kafka.connector.converter.type.Type} for {@link
@@ -33,13 +30,6 @@ import org.apache.kafka.connect.data.Schema;
 public class NanoTimestampType extends AbstractDebeziumTimestampType {
 
     public static final NanoTimestampType INSTANCE = new NanoTimestampType();
-
-    @Override
-    public String getTypeName(Schema schema) {
-        return String.format(
-                "%s(%s)",
-                DorisType.DATETIME, DorisTypeProperties.MAX_SUPPORTED_DATE_TIME_PRECISION);
-    }
 
     @Override
     public String[] getRegistrationKeys() {
