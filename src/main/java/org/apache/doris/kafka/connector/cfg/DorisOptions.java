@@ -119,7 +119,7 @@ public class DorisOptions {
         if (getStreamLoadProp().containsKey(LoadConstants.GROUP_COMMIT)) {
             this.enableGroupCommit =
                     ConfigCheckUtils.validateGroupCommitMode(getStreamLoadProp(), enable2PC());
-            if (isEnableGroupCommit()) {
+            if (!enableGroupCommit) {
                 removeGroupCommitProperties();
             }
         }
