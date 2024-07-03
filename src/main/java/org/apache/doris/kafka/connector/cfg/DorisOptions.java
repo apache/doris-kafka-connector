@@ -116,7 +116,7 @@ public class DorisOptions {
                     Integer.parseInt(config.get(DorisSinkConnectorConfig.REQUEST_READ_TIMEOUT_MS));
         }
         getStreamLoadPropFromConfig(config);
-        if (config.containsKey(LoadConstants.GROUP_COMMIT)) {
+        if (getStreamLoadProp().containsKey(LoadConstants.GROUP_COMMIT)) {
             this.enableGroupCommit =
                     ConfigCheckUtils.validateGroupCommitMode(getStreamLoadProp(), enable2PC());
             if (isEnableGroupCommit()) {
