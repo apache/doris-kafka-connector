@@ -19,6 +19,8 @@
 
 package org.apache.doris.kafka.connector.cfg;
 
+import static org.apache.doris.kafka.connector.writer.LoadConstants.PARTIAL_COLUMNS;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,6 +33,8 @@ import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
+import org.apache.doris.kafka.connector.writer.LoadConstants;
+import org.apache.doris.kafka.connector.writer.load.GroupCommitMode;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +59,7 @@ public class DorisOptions {
     private boolean autoRedirect = true;
     private int requestReadTimeoutMs;
     private int requestConnectTimeoutMs;
+    private final boolean enableGroupCommit;
     /** Properties for the StreamLoad. */
     private final Properties streamLoadProp = new Properties();
 
@@ -113,6 +118,7 @@ public class DorisOptions {
             this.requestReadTimeoutMs =
                     Integer.parseInt(config.get(DorisSinkConnectorConfig.REQUEST_READ_TIMEOUT_MS));
         }
+        this.enableGroupCommit = validateGroupCommitMode(config);
         getStreamLoadPropFromConfig(config);
     }
 
@@ -127,6 +133,32 @@ public class DorisOptions {
                 streamLoadProp.put(subKey, entry.getValue());
             }
         }
+    }
+
+    private boolean validateGroupCommitMode(Map<String, String> config) {
+
+        if (config == null) {
+            return false;
+        }
+
+        if (!config.containsKey(LoadConstants.GROUP_COMMIT)) {
+            return false;
+        }
+        String value = config.get(LoadConstants.GROUP_COMMIT);
+        if (!GroupCommitMode.instances().contains(value.toLowerCase())) {
+            LOG.error("The value of group commit mode is an illegal parameter of {}.", value);
+            return false;
+        } else if (enable2PC()) {
+            LOG.error(
+                    "When group commit is enabled, you should disable two phase commit! Please  set 'enable.2pc':'false'");
+            return false;
+        } else if (streamLoadProp.containsKey(PARTIAL_COLUMNS)
+                && streamLoadProp.get(PARTIAL_COLUMNS).equals("true")) {
+            LOG.error(
+                    "When group commit is enabled,you can not load data with partial column update");
+            return false;
+        }
+        return true;
     }
 
     private void setStreamLoadDefaultValues() {
@@ -180,6 +212,10 @@ public class DorisOptions {
 
     public boolean enable2PC() {
         return enable2PC;
+    }
+
+    public boolean isEnableGroupCommit() {
+        return enableGroupCommit;
     }
 
     public Map<String, String> getTopicMap() {
