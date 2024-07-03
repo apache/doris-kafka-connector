@@ -20,7 +20,9 @@
 package org.apache.doris.kafka.connector.writer.load;
 
 import static org.apache.doris.kafka.connector.writer.LoadConstants.GROUP_COMMIT;
-import static org.apache.doris.kafka.connector.writer.LoadConstants.GROUP_COMMIT_OFF_MODE;
+import static org.apache.doris.kafka.connector.writer.LoadConstants.GROUP_COMMIT_ASYNC_MODE;
+import static org.apache.doris.kafka.connector.writer.LoadConstants.GROUP_COMMIT_SYNC_MODE;
+import static org.apache.doris.kafka.connector.writer.LoadConstants.PARTIAL_COLUMNS;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -68,7 +70,7 @@ public class DorisStreamLoad extends DataLoad {
         this.dorisOptions = dorisOptions;
         this.backendUtils = backendUtils;
         this.topic = topic;
-        this.enableGroupCommit = isGroupCommitEnabled(dorisOptions.getStreamLoadProp());
+        this.enableGroupCommit = isGroupCommitEnabled(dorisOptions);
     }
 
     /** execute stream load. */
@@ -148,9 +150,30 @@ public class DorisStreamLoad extends DataLoad {
         loadUrl = String.format(LOAD_URL_PATTERN, hostPort, database, table);
     }
 
-    private boolean isGroupCommitEnabled(Properties streamLoadProp) {
+    private boolean isGroupCommitEnabled(DorisOptions dorisOptions) {
+        Properties streamLoadProp = dorisOptions.getStreamLoadProp();
+        if (streamLoadProp.containsKey(GROUP_COMMIT)) {
 
-        return streamLoadProp.containsKey(GROUP_COMMIT)
-                && !streamLoadProp.get(GROUP_COMMIT).equals(GROUP_COMMIT_OFF_MODE);
+            Object groupCommitMode = streamLoadProp.get(GROUP_COMMIT);
+            if (groupCommitMode.equals(GROUP_COMMIT_ASYNC_MODE)
+                    || groupCommitMode.equals(GROUP_COMMIT_SYNC_MODE)) {
+                // When the group commit is enabled, some Stream Load and Http Stream are not
+                // executed
+                // in the group commit way,refer to the
+                // document:https://doris.apache.org/docs/data-operate/import/group-commit-manual/
+                if (dorisOptions.enable2PC()) {
+                    LOG.warn(
+                            "When group commit is enabled, you should disable two phase commit! Please  set 'enable.2pc':'false'");
+                    return false;
+                } else if (streamLoadProp.containsKey(PARTIAL_COLUMNS)
+                        && streamLoadProp.get(PARTIAL_COLUMNS).equals("true")) {
+                    LOG.warn(
+                            "When group commit is enabled,you can not load data with partial column update");
+                    return false;
+                }
+                return true;
+            }
+        }
+        return false;
     }
 }
