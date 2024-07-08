@@ -195,7 +195,7 @@ public class DorisOptions {
         return enable2PC;
     }
 
-    public boolean isEnableGroupCommit() {
+    public boolean enableGroupCommit() {
         return enableGroupCommit;
     }
 
