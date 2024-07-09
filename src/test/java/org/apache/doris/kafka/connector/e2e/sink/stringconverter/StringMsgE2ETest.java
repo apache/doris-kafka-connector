@@ -125,6 +125,40 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         checkResult(expected, query, 3);
     }
 
+    @Test
+    public void testPartialUpdate() throws Exception {
+        initialize("src/test/resources/e2e/string_converter/partial_update.json");
+        String topic = "partial_update_test";
+        String msg1 =
+                "{\"id\":1,\"col1\":\"after_update_col1_1\",\"col2\":\"after_update_col2_1\"}";
+        String msg2 =
+                "{\"id\":2,\"col1\":\"after_update_col1_2\",\"col2\":\"after_update_col2_2\"}";
+
+        produceMsg2Kafka(topic, msg1);
+        produceMsg2Kafka(topic, msg2);
+
+        String tableSql =
+                loadContent("src/test/resources/e2e/string_converter/partial_update_tab.sql");
+        String insertSql =
+                loadContent(
+                        "src/test/resources/e2e/string_converter/insert_partial_update_tab.sql");
+        createTable(tableSql);
+        Thread.sleep(2000);
+        insertTable(insertSql);
+        Thread.sleep(15000);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        String table = dorisOptions.getTopicMapTable(topic);
+        List<String> expected =
+                Arrays.asList(
+                        "1,after_update_col1_1,after_update_col2_1,before_update_col3_1",
+                        "2,after_update_col1_2,after_update_col2_2,before_update_col3_2");
+        Thread.sleep(10000);
+        String query =
+                String.format("select id,col1,col2,col3 from %s.%s order by id", database, table);
+        checkResult(expected, query, 4);
+    }
+
     public void checkResult(List<String> expected, String query, int columnSize) throws Exception {
         List<String> actual = new ArrayList<>();
 
@@ -143,6 +177,8 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
                 actual.add(StringUtils.join(row, ","));
             }
         }
+        LOG.info("expected result: {}", Arrays.toString(expected.toArray()));
+        LOG.info("actual result: {}", Arrays.toString(actual.toArray()));
         Assert.assertArrayEquals(expected.toArray(), actual.toArray());
     }
 
