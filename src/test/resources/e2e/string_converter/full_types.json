@@ -13,7 +13,7 @@
     "doris.password":"",
     "doris.http.port":"8030",
     "doris.query.port":"9030",
-    "doris.database":"string_msg",
+    "doris.database":"debezium_ingestion_msg",
     "converter.mode": "debezium_ingestion",
     "load.model":"stream_load",
     "key.converter":"org.apache.kafka.connect.json.JsonConverter",

@@ -1,4 +1,4 @@
-CREATE TABLE string_msg.full_types_tab
+CREATE TABLE debezium_ingestion_msg.full_types_tab
 (
     `id`                   LARGEINT      NULL,
     `tiny_c`               TINYINT       NULL,
