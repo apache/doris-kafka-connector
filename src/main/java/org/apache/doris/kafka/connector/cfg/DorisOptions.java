@@ -31,7 +31,6 @@ import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
-import org.apache.doris.kafka.connector.writer.LoadConstants;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,10 +115,8 @@ public class DorisOptions {
                     Integer.parseInt(config.get(DorisSinkConnectorConfig.REQUEST_READ_TIMEOUT_MS));
         }
         this.streamLoadProp = getStreamLoadPropFromConfig(config);
-        if (getStreamLoadProp().containsKey(LoadConstants.GROUP_COMMIT)) {
-            this.enableGroupCommit =
-                    ConfigCheckUtils.validateGroupCommitMode(getStreamLoadProp(), enable2PC());
-        }
+        this.enableGroupCommit =
+                ConfigCheckUtils.validateGroupCommitMode(getStreamLoadProp(), enable2PC());
     }
 
     private Properties getStreamLoadPropFromConfig(Map<String, String> config) {

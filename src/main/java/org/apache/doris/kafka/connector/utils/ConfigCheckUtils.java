@@ -314,7 +314,7 @@ public class ConfigCheckUtils {
         } else if (streamLoadProp.containsKey(PARTIAL_COLUMNS)
                 && streamLoadProp.get(PARTIAL_COLUMNS).equals("true")) {
             throw new DorisException(
-                    "When group commit is enabled,you can not load data with partial column update");
+                    "When group commit is enabled,you can not load data with partial column update.");
         }
         return true;
     }
