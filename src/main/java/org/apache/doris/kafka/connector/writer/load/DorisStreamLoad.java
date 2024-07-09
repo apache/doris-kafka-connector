@@ -53,6 +53,7 @@ public class DorisStreamLoad extends DataLoad {
     private final CloseableHttpClient httpClient = new HttpUtils().getHttpClient();
     private final BackendUtils backendUtils;
     private Queue<KafkaRespContent> respContents = new LinkedList<>();
+    private final boolean enableGroupCommit;
 
     public DorisStreamLoad(BackendUtils backendUtils, DorisOptions dorisOptions, String topic) {
         this.database = dorisOptions.getDatabase();
@@ -63,10 +64,16 @@ public class DorisStreamLoad extends DataLoad {
         this.dorisOptions = dorisOptions;
         this.backendUtils = backendUtils;
         this.topic = topic;
+        this.enableGroupCommit = dorisOptions.enableGroupCommit();
     }
 
     /** execute stream load. */
     public void load(String label, RecordBuffer buffer) throws IOException {
+
+        if (enableGroupCommit) {
+            label = null;
+        }
+
         refreshLoadUrl(database, table);
         String data = buffer.getData();
         ByteArrayEntity entity = new ByteArrayEntity(data.getBytes(StandardCharsets.UTF_8));
@@ -81,7 +88,12 @@ public class DorisStreamLoad extends DataLoad {
                 .enable2PC(dorisOptions.enable2PC())
                 .addProperties(dorisOptions.getStreamLoadProp());
 
-        LOG.info("stream load started for {} on host {}", label, hostPort);
+        if (enableGroupCommit) {
+            LOG.info("stream load started with group commit on host {}", hostPort);
+        } else {
+            LOG.info("stream load started for {} on host {}", label, hostPort);
+        }
+
         try (CloseableHttpResponse response = httpClient.execute(putBuilder.build())) {
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode == 200 && response.getEntity() != null) {
@@ -101,10 +113,15 @@ public class DorisStreamLoad extends DataLoad {
                 respContent.setLastOffset(buffer.getLastOffset());
                 respContent.setTopic(topic);
                 respContents.add(respContent);
-                return;
             }
         } catch (Exception ex) {
-            String err = "failed to stream load data with label: " + label;
+            String err;
+            if (enableGroupCommit) {
+                err = "failed to stream load data with group commit";
+            } else {
+                err = "failed to stream load data with label: " + label;
+            }
+
             LOG.warn(err, ex);
             throw new StreamLoadException(err, ex);
         }

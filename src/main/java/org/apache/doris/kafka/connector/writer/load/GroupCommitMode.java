@@ -17,17 +17,31 @@
  * under the License.
  */
 
-package org.apache.doris.kafka.connector.writer;
+package org.apache.doris.kafka.connector.writer.load;
 
-public class LoadConstants {
-    public static final String DORIS_DELETE_SIGN = "__DORIS_DELETE_SIGN__";
-    public static final String DORIS_DEL_TRUE = "1";
-    public static final String DORIS_DEL_FALSE = "0";
+import java.util.Arrays;
+import java.util.List;
 
-    // Special identifier, label separator used for kafka-connect sink data
-    public static final String FILE_DELIM_DEFAULT = "__KC_";
+public enum GroupCommitMode {
+    OFF_MODE("off_mode"),
+    SYNC_MODE("sync_mode"),
+    ASYNC_MODE("async_mode");
 
-    // since apache doris 2.1.0, support stream load with group commit mode.
-    public static final String GROUP_COMMIT = "group_commit";
-    public static final String PARTIAL_COLUMNS = "partial_columns";
+    private final String name;
+
+    GroupCommitMode(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public static LoadModel of(String name) {
+        return LoadModel.valueOf(name.toUpperCase());
+    }
+
+    public static List<String> instances() {
+        return Arrays.asList(OFF_MODE.name, SYNC_MODE.name, ASYNC_MODE.name);
+    }
 }

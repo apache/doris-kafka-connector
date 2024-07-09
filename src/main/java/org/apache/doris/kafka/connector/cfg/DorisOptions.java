@@ -55,8 +55,9 @@ public class DorisOptions {
     private boolean autoRedirect = true;
     private int requestReadTimeoutMs;
     private int requestConnectTimeoutMs;
+    private boolean enableGroupCommit;
     /** Properties for the StreamLoad. */
-    private final Properties streamLoadProp = new Properties();
+    private final Properties streamLoadProp;
 
     @Deprecated private String labelPrefix;
     private final String databaseTimeZone;
@@ -113,25 +114,31 @@ public class DorisOptions {
             this.requestReadTimeoutMs =
                     Integer.parseInt(config.get(DorisSinkConnectorConfig.REQUEST_READ_TIMEOUT_MS));
         }
-        getStreamLoadPropFromConfig(config);
+        this.streamLoadProp = getStreamLoadPropFromConfig(config);
+        this.enableGroupCommit =
+                ConfigCheckUtils.validateGroupCommitMode(getStreamLoadProp(), enable2PC());
     }
 
-    private void getStreamLoadPropFromConfig(Map<String, String> config) {
-        setStreamLoadDefaultValues();
+    private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
+        Properties properties = new Properties();
+        properties.putAll(getStreamLoadDefaultValues());
         for (Map.Entry<String, String> entry : config.entrySet()) {
             if (entry.getKey().startsWith(DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX)) {
                 String subKey =
                         entry.getKey()
                                 .substring(
                                         DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX.length());
-                streamLoadProp.put(subKey, entry.getValue());
+                properties.put(subKey, entry.getValue());
             }
         }
+        return properties;
     }
 
-    private void setStreamLoadDefaultValues() {
-        streamLoadProp.setProperty("format", "json");
-        streamLoadProp.setProperty("read_json_by_line", "true");
+    private Properties getStreamLoadDefaultValues() {
+        Properties properties = new Properties();
+        properties.setProperty("format", "json");
+        properties.setProperty("read_json_by_line", "true");
+        return properties;
     }
 
     public String getName() {
@@ -180,6 +187,10 @@ public class DorisOptions {
 
     public boolean enable2PC() {
         return enable2PC;
+    }
+
+    public boolean enableGroupCommit() {
+        return enableGroupCommit;
     }
 
     public Map<String, String> getTopicMap() {

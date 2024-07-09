@@ -24,7 +24,11 @@ import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.exception.DorisException;
@@ -47,12 +51,10 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
     public static void setUp() {
         initServer();
         initProducer();
-        initialize();
     }
 
-    public static void initialize() {
-        jsonMsgConnectorContent =
-                loadContent("src/test/resources/e2e/string_converter/string_msg_connector.json");
+    public static void initialize(String connectorPath) {
+        jsonMsgConnectorContent = loadContent(connectorPath);
         JsonNode rootNode = null;
         try {
             rootNode = objectMapper.readTree(jsonMsgConnectorContent);
@@ -73,6 +75,8 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
 
     @Test
     public void testStringMsg() throws IOException, InterruptedException, SQLException {
+        initialize("src/test/resources/e2e/string_converter/string_msg_connector.json");
+        Thread.sleep(5000);
         String topic = "string_test";
         String msg = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
 
@@ -97,6 +101,49 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         Assert.assertEquals(1, id);
         Assert.assertEquals("zhangsan", name);
         Assert.assertEquals(12, age);
+    }
+
+    @Test
+    public void testGroupCommit() throws Exception {
+
+        initialize("src/test/resources/e2e/string_converter/group_commit_connector.json");
+        String topic = "group_commit_test";
+        String msg1 = "{\"id\":1,\"name\":\"kafka\",\"age\":12}";
+        String msg2 = "{\"id\":2,\"name\":\"doris\",\"age\":10}";
+
+        produceMsg2Kafka(topic, msg1);
+        produceMsg2Kafka(topic, msg2);
+        String tableSql =
+                loadContent("src/test/resources/e2e/string_converter/group_commit_tab.sql");
+        createTable(tableSql);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+        Thread.sleep(25000);
+
+        String table = dorisOptions.getTopicMapTable(topic);
+        List<String> expected = Arrays.asList("1,kafka,12", "2,doris,10");
+        String query = String.format("select id,name,age from %s.%s order by id", database, table);
+        checkResult(expected, query, 3);
+    }
+
+    public void checkResult(List<String> expected, String query, int columnSize) throws Exception {
+        List<String> actual = new ArrayList<>();
+
+        try (Statement statement = getJdbcConnection().createStatement()) {
+            ResultSet sinkResultSet = statement.executeQuery(query);
+            while (sinkResultSet.next()) {
+                List<String> row = new ArrayList<>();
+                for (int i = 1; i <= columnSize; i++) {
+                    Object value = sinkResultSet.getObject(i);
+                    if (value == null) {
+                        row.add("null");
+                    } else {
+                        row.add(value.toString());
+                    }
+                }
+                actual.add(StringUtils.join(row, ","));
+            }
+        }
+        Assert.assertArrayEquals(expected.toArray(), actual.toArray());
     }
 
     @AfterClass
