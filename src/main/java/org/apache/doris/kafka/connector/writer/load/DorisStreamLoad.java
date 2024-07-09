@@ -64,7 +64,7 @@ public class DorisStreamLoad extends DataLoad {
         this.dorisOptions = dorisOptions;
         this.backendUtils = backendUtils;
         this.topic = topic;
-        this.enableGroupCommit = dorisOptions.isEnableGroupCommit();
+        this.enableGroupCommit = dorisOptions.enableGroupCommit();
     }
 
     /** execute stream load. */

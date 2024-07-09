@@ -305,18 +305,16 @@ public class ConfigCheckUtils {
         }
 
         Object value = streamLoadProp.get(LoadConstants.GROUP_COMMIT);
-        if (!GroupCommitMode.instances().contains(value.toString().toLowerCase())) {
-            LOG.error("The value of group commit mode is an illegal parameter of {}.", value);
-            return false;
+        String normalizedValue = value.toString().trim().toLowerCase();
+        if (!GroupCommitMode.instances().contains(normalizedValue)) {
+            throw new DorisException("The value of group commit mode is an illegal parameter.");
         } else if (enable2PC) {
-            LOG.error(
+            throw new DorisException(
                     "When group commit is enabled, you should disable two phase commit! Please  set 'enable.2pc':'false'");
-            return false;
         } else if (streamLoadProp.containsKey(PARTIAL_COLUMNS)
                 && streamLoadProp.get(PARTIAL_COLUMNS).equals("true")) {
-            LOG.error(
+            throw new DorisException(
                     "When group commit is enabled,you can not load data with partial column update");
-            return false;
         }
         return true;
     }
