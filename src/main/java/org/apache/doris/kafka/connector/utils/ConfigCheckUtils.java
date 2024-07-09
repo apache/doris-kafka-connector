@@ -307,7 +307,7 @@ public class ConfigCheckUtils {
         Object value = streamLoadProp.get(LoadConstants.GROUP_COMMIT);
         String normalizedValue = value.toString().trim().toLowerCase();
         if (!GroupCommitMode.instances().contains(normalizedValue)) {
-            throw new DorisException("The value of group commit mode is an illegal parameter.");
+           throw new DorisException("The value of group commit mode is an illegal parameter, illegal value=" + value);
         } else if (enable2PC) {
             throw new DorisException(
                     "When group commit is enabled, you should disable two phase commit! Please  set 'enable.2pc':'false'");
