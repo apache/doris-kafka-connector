@@ -6,7 +6,7 @@
     "tasks.max":"1",
     "doris.topic2table.map": "partial_update_test:partial_update_tab",
     "buffer.count.records":"2",
-    "buffer.flush.time":"120",
+    "buffer.flush.time":"10",
     "buffer.size.bytes":"10000000",
     "doris.urls":"127.0.0.1",
     "doris.user":"root",
