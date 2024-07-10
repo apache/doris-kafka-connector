@@ -1,0 +1,22 @@
+{
+  "name":"mysql_all_types",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"full_types",
+    "tasks.max":"1",
+    "doris.topic2table.map": "full_types:full_types_tab",
+    "buffer.count.records":"1",
+    "buffer.flush.time":"10",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"debezium_ingestion_msg",
+    "converter.mode": "debezium_ingestion",
+    "load.model":"stream_load",
+    "key.converter":"org.apache.kafka.connect.json.JsonConverter",
+    "value.converter":"org.apache.kafka.connect.json.JsonConverter"
+  }
+}

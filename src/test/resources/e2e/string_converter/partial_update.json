@@ -1,0 +1,24 @@
+{
+  "name":"partial_update_connector",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"partial_update_test",
+    "tasks.max":"1",
+    "doris.topic2table.map": "partial_update_test:partial_update_tab",
+    "buffer.count.records":"2",
+    "buffer.flush.time":"10",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"string_msg",
+    "sink.properties.partial_columns":"true",
+    "sink.properties.columns": "id,col1,col2",
+    "enable.2pc": "false",
+    "load.model":"stream_load",
+    "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "value.converter":"org.apache.kafka.connect.storage.StringConverter"
+  }
+}

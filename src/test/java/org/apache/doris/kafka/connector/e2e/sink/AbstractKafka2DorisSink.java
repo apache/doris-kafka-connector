@@ -108,6 +108,18 @@ public abstract class AbstractKafka2DorisSink {
         LOG.info("Create doris table successfully. sql={}", sql);
     }
 
+    protected void insertTable(String sql) {
+        LOG.info("Will insert data to Doris table. SQL: {}", sql);
+        try {
+            Statement statement = getJdbcConnection().createStatement();
+            int rowCount = statement.executeUpdate(sql);
+            LOG.info("Inserted {} item data into the Doris table.", rowCount);
+        } catch (SQLException e) {
+            throw new DorisException("Failed to insert data to Doris table.", e);
+        }
+        LOG.info("Data insertion to Doris table was successful. SQL: {}", sql);
+    }
+
     private static void initDorisBase() {
         if (Objects.nonNull(dorisContainerService)) {
             return;
