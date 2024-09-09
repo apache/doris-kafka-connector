@@ -206,7 +206,7 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         String table = dorisOptions.getTopicMapTable(topic);
         List<String> expected =
                 Collections.singletonList(
-                        "1,2024-09-09 12:34:56,2024-09-09 12:34:56,2024-09-09,12:34:56,12:34:56,37091106000000");
+                        "1,2024-09-09T12:34:56,2024-09-09T12:34:56,2024-09-09,12:34:56,12:34:56,37091106000000");
         Thread.sleep(10000);
         String query = String.format("select * from %s.%s order by id", database, table);
         checkResult(expected, query, 7);
