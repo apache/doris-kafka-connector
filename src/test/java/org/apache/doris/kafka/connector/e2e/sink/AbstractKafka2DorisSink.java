@@ -98,7 +98,7 @@ public abstract class AbstractKafka2DorisSink {
         try (Statement statement = connection.createStatement()) {
             for (String s : sql) {
                 if (StringUtils.isNotEmpty(s)) {
-                    statement.executeQuery(s);
+                    statement.execute(s);
                 }
             }
         } catch (SQLException e) {
