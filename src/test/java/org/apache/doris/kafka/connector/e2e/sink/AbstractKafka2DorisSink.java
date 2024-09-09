@@ -32,6 +32,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.e2e.doris.DorisContainerService;
 import org.apache.doris.kafka.connector.e2e.doris.DorisContainerServiceImpl;
 import org.apache.doris.kafka.connector.e2e.kafka.KafkaContainerService;
@@ -71,9 +72,13 @@ public abstract class AbstractKafka2DorisSink {
         kafkaInstanceHostAndPort = kafkaContainerService.getInstanceHostAndPort();
     }
 
-    protected static Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(
-                String.format(JDBC_URL, dorisInstanceHost), USERNAME, PASSWORD);
+    protected static Connection getJdbcConnection() {
+        try {
+            return DriverManager.getConnection(
+                    String.format(JDBC_URL, dorisInstanceHost), USERNAME, PASSWORD);
+        } catch (SQLException e) {
+            throw new DorisException(e);
+        }
     }
 
     protected static String loadContent(String path) {
@@ -83,6 +88,22 @@ public abstract class AbstractKafka2DorisSink {
                     .collect(Collectors.joining("\n"));
         } catch (IOException e) {
             throw new DorisException("Failed to read " + path + " file.", e);
+        }
+    }
+
+    protected static void executeSql(Connection connection, String... sql) {
+        if (sql == null || sql.length == 0) {
+            return;
+        }
+        try (Statement statement = connection.createStatement()) {
+            for (String s : sql) {
+                if (StringUtils.isNotEmpty(s)) {
+                    statement.executeQuery(s);
+                }
+            }
+        } catch (SQLException e) {
+            LOG.error("Failed to execute sql.", e);
+            throw new DorisException(e);
         }
     }
 

@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -71,6 +72,11 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         dorisOptions = new DorisOptions(lowerCaseConfigMap);
         database = dorisOptions.getDatabase();
         createDatabase(database);
+        setTimeZone();
+    }
+
+    private static void setTimeZone() {
+        executeSql(getJdbcConnection(), "set global time_zone = 'Asia/Shanghai'");
     }
 
     @Test
@@ -182,6 +188,28 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         Thread.sleep(10000);
         String query = String.format("select * from %s.%s order by id", database, table);
         checkResult(expected, query, 51);
+    }
+
+    @Test
+    public void testTimeExampleTypes() throws Exception {
+        initialize("src/test/resources/e2e/string_converter/time_types.json");
+        String topic = "time_example";
+        String msg1 =
+                "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"default\":0,\"field\":\"id\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTimestamp\",\"version\":1,\"field\":\"timestamp_without_timezone\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"timestamp_with_timezone\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"date_only\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"time_without_timezone\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTime\",\"version\":1,\"field\":\"time_with_timezone\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroDuration\",\"version\":1,\"field\":\"interval_period\"}],\"optional\":true,\"name\":\"pg.public.time_example.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"default\":0,\"field\":\"id\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTimestamp\",\"version\":1,\"field\":\"timestamp_without_timezone\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"timestamp_with_timezone\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"date_only\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"time_without_timezone\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTime\",\"version\":1,\"field\":\"time_with_timezone\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroDuration\",\"version\":1,\"field\":\"interval_period\"}],\"optional\":true,\"name\":\"pg.public.time_example.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.data.Enum\",\"version\":1,\"parameters\":{\"allowed\":\"true,last,false,incremental\"},\"default\":\"false\",\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"sequence\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ns\"},{\"type\":\"string\",\"optional\":false,\"field\":\"schema\"},{\"type\":\"string\",\"optional\":false,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"txId\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"lsn\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"xmin\"}],\"optional\":false,\"name\":\"io.debezium.connector.postgresql.Source\",\"field\":\"source\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"id\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"total_order\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"data_collection_order\"}],\"optional\":true,\"name\":\"event.block\",\"version\":1,\"field\":\"transaction\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ns\"}],\"optional\":false,\"name\":\"pg.public.time_example.Envelope\",\"version\":2},\"payload\":{\"before\":null,\"after\":{\"id\":1,\"timestamp_without_timezone\":1725885296000000,\"timestamp_with_timezone\":\"2024-09-09T04:34:56.000000Z\",\"date_only\":19975,\"time_without_timezone\":45296000000,\"time_with_timezone\":\"04:34:56Z\",\"interval_period\":37091106000000},\"source\":{\"version\":\"2.7.2.Final\",\"connector\":\"postgresql\",\"name\":\"pg\",\"ts_ms\":1725875246492,\"snapshot\":\"false\",\"db\":\"wdl\",\"sequence\":\"[\\\"24499552\\\",\\\"24499656\\\"]\",\"ts_us\":1725875246492139,\"ts_ns\":1725875246492139000,\"schema\":\"public\",\"table\":\"time_example\",\"txId\":772,\"lsn\":24499656,\"xmin\":null},\"transaction\":null,\"op\":\"c\",\"ts_ms\":1725875246751,\"ts_us\":1725875246751420,\"ts_ns\":1725875246751420000}}";
+        produceMsg2Kafka(topic, msg1);
+
+        String tableSql = loadContent("src/test/resources/e2e/string_converter/time_types.sql");
+        createTable(tableSql);
+        Thread.sleep(2000);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        String table = dorisOptions.getTopicMapTable(topic);
+        List<String> expected =
+                Collections.singletonList(
+                        "1,2024-09-09 12:34:56,2024-09-09 12:34:56,2024-09-09,12:34:56,12:34:56,37091106000000");
+        Thread.sleep(10000);
+        String query = String.format("select * from %s.%s order by id", database, table);
+        checkResult(expected, query, 7);
     }
 
     public void checkResult(List<String> expected, String query, int columnSize) throws Exception {
