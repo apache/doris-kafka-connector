@@ -23,4 +23,4 @@ mvn clean package -Dmaven.test.skip=true
 rm -rf dist
 mkdir -p dist
 
-cp -r target/doris-kafka-connector-1.0.0-SNAPSHOT.jar dist
+cp -r target/doris-kafka-connector-24.0.0-SNAPSHOT.jar dist
