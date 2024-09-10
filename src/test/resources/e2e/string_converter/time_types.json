@@ -1,0 +1,22 @@
+{
+  "name":"postgres_time_example",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"time_example",
+    "tasks.max":"1",
+    "doris.topic2table.map": "time_example:time_example",
+    "buffer.count.records":"1",
+    "buffer.flush.time":"10",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"test_time",
+    "converter.mode": "debezium_ingestion",
+    "database.time_zone":"Asia/Shanghai",
+    "key.converter":"org.apache.kafka.connect.json.JsonConverter",
+    "value.converter":"org.apache.kafka.connect.json.JsonConverter"
+  }
+}
