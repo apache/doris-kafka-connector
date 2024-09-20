@@ -179,12 +179,13 @@ public class DorisAvroConverter extends DorisConverter {
         // There are conversions for other logical types as well.
         genericData.addLogicalTypeConversion(new Conversions.DecimalConversion());
 
-        InputStream is = new ByteArrayInputStream(data);
-        Decoder decoder = DecoderFactory.get().binaryDecoder(is, null);
-        DatumReader<GenericRecord> reader =
-                new GenericDatumReader<>(writerSchema, readerSchema, genericData);
-        GenericRecord datum = reader.read(null, decoder);
-        return datum.toString();
+        try (InputStream is = new ByteArrayInputStream(data)) {
+            Decoder decoder = DecoderFactory.get().binaryDecoder(is, null);
+            DatumReader<GenericRecord> reader =
+                    new GenericDatumReader<>(writerSchema, readerSchema, genericData);
+            GenericRecord datum = reader.read(null, decoder);
+            return datum.toString();
+        }
     }
 
     @VisibleForTesting
