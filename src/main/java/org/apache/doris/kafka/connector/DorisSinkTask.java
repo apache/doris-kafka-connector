@@ -22,10 +22,8 @@ package org.apache.doris.kafka.connector;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.service.DorisSinkService;
 import org.apache.doris.kafka.connector.service.DorisSinkServiceFactory;
-import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.utils.Version;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -38,9 +36,7 @@ import org.slf4j.LoggerFactory;
 /** DorisSinkTask implements SinkTask for Kafka Connect framework. */
 public class DorisSinkTask extends SinkTask {
     private static final Logger LOG = LoggerFactory.getLogger(DorisSinkTask.class);
-
     private DorisSinkService sink = null;
-    private Map<String, String> topic2table = null;
 
     /** default constructor, invoked by kafka connect framework */
     public DorisSinkTask() {}
@@ -54,8 +50,6 @@ public class DorisSinkTask extends SinkTask {
     @Override
     public void start(final Map<String, String> parsedConfig) {
         LOG.info("kafka doris sink task start");
-        // generate topic to table map
-        this.topic2table = getTopicToTableMap(parsedConfig);
         this.sink = DorisSinkServiceFactory.getDorisSinkService(parsedConfig);
     }
 
@@ -76,10 +70,7 @@ public class DorisSinkTask extends SinkTask {
     @Override
     public void open(final Collection<TopicPartition> partitions) {
         LOG.info("kafka doris sink task open with {}", partitions.toString());
-        partitions.forEach(
-                tp ->
-                        this.sink.startTask(
-                                ConfigCheckUtils.tableName(tp.topic(), this.topic2table), tp));
+        partitions.forEach(tp -> this.sink.startTask(tp));
     }
 
     /**
@@ -145,24 +136,5 @@ public class DorisSinkTask extends SinkTask {
     @Override
     public String version() {
         return Version.getVersion();
-    }
-
-    /**
-     * parse topic to table map
-     *
-     * @param config connector config file
-     * @return result map
-     */
-    static Map<String, String> getTopicToTableMap(Map<String, String> config) {
-        if (config.containsKey(DorisSinkConnectorConfig.TOPICS_TABLES_MAP)) {
-            Map<String, String> result =
-                    ConfigCheckUtils.parseTopicToTableMap(
-                            config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP));
-            if (result != null) {
-                return result;
-            }
-            LOG.error("Invalid Input, Topic2Table Map disabled");
-        }
-        return new HashMap<>();
     }
 }

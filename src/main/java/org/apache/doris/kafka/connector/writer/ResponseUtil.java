@@ -23,8 +23,6 @@ import java.util.regex.Pattern;
 
 /** util for handle response. */
 public class ResponseUtil {
-    public static final Pattern LABEL_EXIST_PATTERN =
-            Pattern.compile("Label \\[(.*)\\] has already been used, relate to txn \\[(\\d+)\\]");
     public static final Pattern COMMITTED_PATTERN =
             Pattern.compile(
                     "transaction \\[(\\d+)\\] is already \\b(COMMITTED|committed|VISIBLE|visible)\\b, not pre-committed.");
