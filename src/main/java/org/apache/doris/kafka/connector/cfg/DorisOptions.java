@@ -22,7 +22,6 @@ package org.apache.doris.kafka.connector.cfg;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -88,7 +87,9 @@ public class DorisOptions {
                 Integer.parseInt(config.get(DorisSinkConnectorConfig.BUFFER_COUNT_RECORDS));
 
         this.flushTime = Long.parseLong(config.get(DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC));
-        this.topicMap = getTopicToTableMap(config);
+        this.topicMap =
+                ConfigCheckUtils.parseTopicToTableMap(
+                        config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP));
 
         this.enable2PC = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC));
         this.enableCustomJMX = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.JMX_OPT));
@@ -291,23 +292,5 @@ public class DorisOptions {
 
     public boolean isEnableDelete() {
         return enableDelete;
-    }
-
-    /**
-     * parse topic to table map
-     *
-     * @param config connector config file
-     * @return result map
-     */
-    static Map<String, String> getTopicToTableMap(Map<String, String> config) {
-        if (config.containsKey(DorisSinkConnectorConfig.TOPICS_TABLES_MAP)) {
-            Map<String, String> result =
-                    ConfigCheckUtils.parseTopicToTableMap(
-                            config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP));
-            if (result != null) {
-                return result;
-            }
-        }
-        return new HashMap<>();
     }
 }

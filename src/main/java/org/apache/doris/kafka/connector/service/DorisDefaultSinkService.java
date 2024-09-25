@@ -73,6 +73,11 @@ public class DorisDefaultSinkService implements DorisSinkService {
                         this.metricsJmxReporter);
     }
 
+    @Override
+    public void startTask(TopicPartition topicPartition) {
+        startTask(null, topicPartition);
+    }
+
     /**
      * Create new task
      *
