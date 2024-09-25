@@ -29,7 +29,6 @@ import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.metrics.MetricsJmxReporter;
-import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.CopyIntoWriter;
 import org.apache.doris.kafka.connector.writer.DorisWriter;
 import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
@@ -54,7 +53,6 @@ public class DorisDefaultSinkService implements DorisSinkService {
 
     private final ConnectionProvider conn;
     private final Map<String, DorisWriter> writer;
-    private final Map<String, String> topic2TableMap;
     private final DorisOptions dorisOptions;
     private final MetricsJmxReporter metricsJmxReporter;
     private final DorisConnectMonitor connectMonitor;
@@ -62,7 +60,6 @@ public class DorisDefaultSinkService implements DorisSinkService {
     DorisDefaultSinkService(Map<String, String> config) {
         this.dorisOptions = new DorisOptions(config);
         this.writer = new HashMap<>();
-        this.topic2TableMap = new HashMap<>();
         this.conn = new JdbcConnectionProvider(dorisOptions);
         MetricRegistry metricRegistry = new MetricRegistry();
         this.metricsJmxReporter = new MetricsJmxReporter(metricRegistry, dorisOptions.getName());
