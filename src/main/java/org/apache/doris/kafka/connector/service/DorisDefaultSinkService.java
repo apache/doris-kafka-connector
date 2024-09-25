@@ -135,9 +135,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
         String nameIndex = getNameIndex(record.topic(), record.kafkaPartition());
         // init a new topic partition
         if (!writer.containsKey(nameIndex)) {
-            startTask(
-                    ConfigCheckUtils.tableName(record.topic(), this.topic2TableMap),
-                    new TopicPartition(record.topic(), record.kafkaPartition()));
+            startTask(new TopicPartition(record.topic(), record.kafkaPartition()));
         }
         writer.get(nameIndex).insert(record);
     }
