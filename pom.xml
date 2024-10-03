@@ -89,7 +89,7 @@
         <mysql-connector.version>8.0.30</mysql-connector.version>
         <jackson.version>2.13.2.1</jackson.version>
         <httpcomponents.version>4.5.13</httpcomponents.version>
-        <commons-io.version>2.3</commons-io.version>
+        <commons-io.version>2.14.0</commons-io.version>
         <geometry.version>2.2.0</geometry.version>
         <testcontainers.version>1.17.6</testcontainers.version>
     </properties>
