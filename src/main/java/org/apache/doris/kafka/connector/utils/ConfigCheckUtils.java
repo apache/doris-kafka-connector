@@ -207,6 +207,7 @@ public class ConfigCheckUtils {
      * @param topic2table topic to table map
      * @return valid table name
      */
+    @Deprecated
     public static String tableName(String topic, Map<String, String> topic2table) {
         return generateValidName(topic, topic2table);
     }
@@ -218,6 +219,7 @@ public class ConfigCheckUtils {
      * @param topic2table topic to table map
      * @return valid table/application name
      */
+    @Deprecated
     public static String generateValidName(String topic, Map<String, String> topic2table) {
         if (topic == null || topic.isEmpty()) {
             throw new DorisException("Topic name is empty String or null");

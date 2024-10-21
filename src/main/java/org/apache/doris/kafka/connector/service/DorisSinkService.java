@@ -27,6 +27,14 @@ import org.apache.kafka.connect.sink.SinkRecord;
 
 /** Background service of data sink, responsible to create/drop table and insert/delete files */
 public interface DorisSinkService {
+
+    /**
+     * Start the Task.
+     *
+     * @param topicPartition TopicPartition passed from Kafka
+     */
+    void startTask(TopicPartition topicPartition);
+
     /**
      * Start the Task. This should handle any configuration parsing and one-time setup of the task.
      *
