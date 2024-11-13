@@ -31,6 +31,7 @@ import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.converter.RecordService;
 import org.apache.doris.kafka.connector.exception.ArgumentsException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
+import org.apache.doris.kafka.connector.service.RestService;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,6 +96,16 @@ public abstract class DorisWriter {
         this.connectionProvider = connectionProvider;
         this.recordService = new RecordService(dorisOptions);
         this.connectMonitor = connectMonitor;
+        checkDorisTableKey(tableName);
+    }
+
+    /** The uniq model has 2pc close by default unless 2pc is forced open. */
+    private void checkDorisTableKey(String tableName) {
+        if (dorisOptions.enable2PC()
+                && !dorisOptions.force2PC()
+                && RestService.isUniqueKeyType(dorisOptions, tableName, LOG)) {
+            dorisOptions.setEnable2PC(false);
+        }
     }
 
     /** read offset from doris */

@@ -50,7 +50,8 @@ public class DorisOptions {
     private final boolean enableCustomJMX;
     private final int taskId;
     private final boolean enableDelete;
-    private final boolean enable2PC;
+    private boolean enable2PC = true;
+    private boolean force2PC;
     private boolean autoRedirect = true;
     private int requestReadTimeoutMs;
     private int requestConnectTimeoutMs;
@@ -91,7 +92,14 @@ public class DorisOptions {
                 ConfigCheckUtils.parseTopicToTableMap(
                         config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP));
 
-        this.enable2PC = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC));
+        if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
+            if (Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC))) {
+                this.enable2PC = true;
+                this.force2PC = true;
+            } else {
+                this.enable2PC = false;
+            }
+        }
         this.enableCustomJMX = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.JMX_OPT));
         this.enableDelete =
                 Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_DELETE));
@@ -188,6 +196,14 @@ public class DorisOptions {
 
     public boolean enable2PC() {
         return enable2PC;
+    }
+
+    public boolean force2PC() {
+        return force2PC;
+    }
+
+    public void setEnable2PC(boolean enable2PC) {
+        this.enable2PC = enable2PC;
     }
 
     public boolean enableGroupCommit() {
