@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
@@ -37,12 +38,15 @@ import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
+import org.apache.doris.kafka.connector.service.RestService;
 import org.apache.doris.kafka.connector.writer.commit.DorisCommittable;
 import org.apache.doris.kafka.connector.writer.load.DorisStreamLoad;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.MockedStatic;
 
 public class TestStreamLoadWriter {
 
@@ -50,6 +54,7 @@ public class TestStreamLoadWriter {
     private DorisOptions dorisOptions;
 
     private final Map<String, String> label2Status = new HashMap<>();
+    private MockedStatic<RestService> mockRestService;
 
     @Before
     public void init() throws IOException {
@@ -63,6 +68,7 @@ public class TestStreamLoadWriter {
         props.put("task_id", "1");
         props.put("name", "sink-connector-test");
         dorisOptions = new DorisOptions((Map) props);
+        mockRestService = mockStatic(RestService.class);
         fillLabel2Status();
     }
 
@@ -99,6 +105,9 @@ public class TestStreamLoadWriter {
                                 new JdbcConnectionProvider(dorisOptions),
                                 dorisConnectMonitor));
 
+        mockRestService
+                .when(() -> RestService.isUniqueKeyType(any(), any(), any()))
+                .thenReturn(true);
         doReturn(label2Status).when(streamLoadWriter).fetchLabel2Status();
         return streamLoadWriter;
     }
@@ -128,6 +137,9 @@ public class TestStreamLoadWriter {
                         dorisConnectMonitor);
         streamLoadWriter.setDorisStreamLoad(streamLoad);
 
+        mockRestService
+                .when(() -> RestService.isUniqueKeyType(any(), any(), any()))
+                .thenReturn(true);
         dorisWriter = streamLoadWriter;
         dorisWriter.insert(TestRecordBuffer.newSinkRecord("doris-1", 1));
         dorisWriter.insert(TestRecordBuffer.newSinkRecord("doris-2", 2));
@@ -148,8 +160,40 @@ public class TestStreamLoadWriter {
                         dorisOptions,
                         new JdbcConnectionProvider(dorisOptions),
                         dorisConnectMonitor);
+
+        mockRestService
+                .when(() -> RestService.isUniqueKeyType(any(), any(), any()))
+                .thenReturn(false);
         SinkRecord record = TestRecordBuffer.newSinkRecord("doris-1", 2);
         dorisWriter.putBuffer(record);
         Assert.assertEquals(2, dorisWriter.getBuffer().getLastOffset());
+    }
+
+    @Test
+    public void test2PCInUnique() {
+
+        StreamLoadWriter dorisWriter = (StreamLoadWriter) mockStreamLoadWriter(new HashMap<>());
+        // test 2PC in unique key model scenario
+        mockRestService
+                .when(() -> RestService.isUniqueKeyType(any(), any(), any()))
+                .thenReturn(true);
+        dorisWriter.checkDorisTableKey("unique_table");
+        Assert.assertFalse(dorisOptions.enable2PC());
+    }
+
+    @Test
+    public void test2PCNotUnique() {
+        StreamLoadWriter dorisWriter = (StreamLoadWriter) mockStreamLoadWriter(new HashMap<>());
+        // test 2PC in not unique key model scenario
+        mockRestService
+                .when(() -> RestService.isUniqueKeyType(any(), any(), any()))
+                .thenReturn(false);
+        dorisWriter.checkDorisTableKey("not_unique_table");
+        Assert.assertTrue(dorisOptions.enable2PC());
+    }
+
+    @After
+    public void close() {
+        mockRestService.close();
     }
 }

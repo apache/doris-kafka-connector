@@ -124,8 +124,7 @@ public class DorisOptions {
                     Integer.parseInt(config.get(DorisSinkConnectorConfig.REQUEST_READ_TIMEOUT_MS));
         }
         this.streamLoadProp = getStreamLoadPropFromConfig(config);
-        this.enableGroupCommit =
-                ConfigCheckUtils.validateGroupCommitMode(getStreamLoadProp(), enable2PC());
+        this.enableGroupCommit = ConfigCheckUtils.validateGroupCommitMode(this);
     }
 
     private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
