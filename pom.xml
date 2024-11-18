@@ -82,7 +82,7 @@
         <avro.version>1.11.3</avro.version>
         <metrics.version>4.2.25</metrics.version>
         <spotless.version>2.4.2</spotless.version>
-        <debezium.version>1.9.8.Final</debezium.version>
+        <debezium.version>2.3.0.Final</debezium.version>
         <mockito.version>4.2.0</mockito.version>
         <junit.version>4.13.1</junit.version>
         <slf4j.version>1.7.25</slf4j.version>
