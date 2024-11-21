@@ -32,13 +32,13 @@ import org.slf4j.LoggerFactory;
 
 public class GeoUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(GeoUtils.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private GeoUtils() {}
 
     public static Object handleGeoStructData(Object sourceValue) {
         // the Geometry datatype in MySQL will be converted to
         // a String with Json format
-        final ObjectMapper objectMapper = new ObjectMapper();
         Struct geometryStruct = (Struct) sourceValue;
 
         try {
