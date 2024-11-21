@@ -19,6 +19,8 @@
 
 package org.apache.doris.kafka.connector.cfg;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -292,22 +294,50 @@ public class TestDorisSinkConnectorConfig {
         }
     }
 
+    private DorisOptions initDorisOptions(Map<String, String> customConfig) {
+        Properties loadProps = new Properties();
+        InputStream stream =
+                this.getClass()
+                        .getClassLoader()
+                        .getResourceAsStream("doris-connector-sink.properties");
+        try {
+            loadProps.load(stream);
+            DorisSinkConnectorConfig.setDefaultValues((Map) loadProps);
+            loadProps.put("task_id", "1");
+        } catch (IOException e) {
+            throw new DorisException(e);
+        }
+        Map<String, String> config = (Map) loadProps;
+        config.putAll(customConfig);
+        return new DorisOptions(config);
+    }
+
     @Test(expected = DorisException.class)
     public void testGroupCommitWithIllegalParams() {
         Map<String, String> config = getConfig();
         config.put("sink.properties.group_commit", "sync_modes");
-        Properties streamLoadProp = getStreamLoadPropFromConfig(config);
         config.put(DorisSinkConnectorConfig.ENABLE_2PC, "false");
-        ConfigCheckUtils.validateGroupCommitMode(streamLoadProp, false);
+        DorisOptions dorisOptions = initDorisOptions(config);
+        ConfigCheckUtils.validateGroupCommitMode(dorisOptions);
     }
 
     @Test(expected = DorisException.class)
     public void testGroupCommitModeWithEnable2pc() {
         Map<String, String> config = getConfig();
         config.put("sink.properties.group_commit", "sync_mode");
-        Properties streamLoadProp = getStreamLoadPropFromConfig(config);
-        boolean enable2pc = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC));
-        ConfigCheckUtils.validateGroupCommitMode(streamLoadProp, enable2pc);
+        config.put(DorisSinkConnectorConfig.ENABLE_2PC, "true");
+        DorisOptions dorisOptions = initDorisOptions(config);
+        ConfigCheckUtils.validateGroupCommitMode(dorisOptions);
+    }
+
+    @Test
+    public void testGroupCommitModeWithDisable2pc() {
+        Map<String, String> config = getConfig();
+        config.put("sink.properties.group_commit", "sync_mode");
+        config.put(DorisSinkConnectorConfig.ENABLE_2PC, "false");
+        DorisOptions dorisOptions = initDorisOptions(config);
+        ConfigCheckUtils.validateGroupCommitMode(dorisOptions);
+        Assert.assertFalse(dorisOptions.enable2PC());
     }
 
     @Test(expected = DorisException.class)
@@ -315,31 +345,16 @@ public class TestDorisSinkConnectorConfig {
         Map<String, String> config = getConfig();
         config.put("sink.properties.group_commit", "sync_mode");
         config.put("sink.properties.partial_columns", "true");
-        config.put(DorisSinkConnectorConfig.ENABLE_2PC, "false");
-        Properties streamLoadProp = getStreamLoadPropFromConfig(config);
-        ConfigCheckUtils.validateGroupCommitMode(streamLoadProp, false);
+        DorisOptions dorisOptions = initDorisOptions(config);
+        ConfigCheckUtils.validateGroupCommitMode(dorisOptions);
     }
 
     @Test
     public void testGroupCommitWithAsyncMode() {
         Map<String, String> config = getConfig();
         config.put("sink.properties.group_commit", "async_mode");
-        Properties streamLoadProp = getStreamLoadPropFromConfig(config);
-        config.put(DorisSinkConnectorConfig.ENABLE_2PC, "false");
-        ConfigCheckUtils.validateGroupCommitMode(streamLoadProp, false);
-    }
-
-    private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
-        Properties streamLoadProp = new Properties();
-        for (Map.Entry<String, String> entry : config.entrySet()) {
-            if (entry.getKey().startsWith(DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX)) {
-                String subKey =
-                        entry.getKey()
-                                .substring(
-                                        DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX.length());
-                streamLoadProp.put(subKey, entry.getValue());
-            }
-        }
-        return streamLoadProp;
+        DorisOptions dorisOptions = initDorisOptions(config);
+        ConfigCheckUtils.validateGroupCommitMode(dorisOptions);
+        Assert.assertFalse(dorisOptions.enable2PC());
     }
 }

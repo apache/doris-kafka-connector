@@ -34,6 +34,7 @@ import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.exception.StreamLoadException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.model.KafkaRespContent;
+import org.apache.doris.kafka.connector.service.RestService;
 import org.apache.doris.kafka.connector.utils.BackendUtils;
 import org.apache.doris.kafka.connector.utils.FileNameUtils;
 import org.apache.doris.kafka.connector.writer.commit.DorisCommittable;
@@ -66,6 +67,20 @@ public class StreamLoadWriter extends DorisWriter {
         BackendUtils backendUtils = BackendUtils.getInstance(dorisOptions, LOG);
         this.dorisCommitter = new DorisCommitter(dorisOptions, backendUtils);
         this.dorisStreamLoad = new DorisStreamLoad(backendUtils, dorisOptions, topic);
+        checkDorisTableKey(tableName);
+    }
+
+    /** The uniq model has 2pc close by default unless 2pc is forced open. */
+    @VisibleForTesting
+    public void checkDorisTableKey(String tableName) {
+        if (dorisOptions.enable2PC()
+                && !dorisOptions.force2PC()
+                && RestService.isUniqueKeyType(dorisOptions, tableName, LOG)) {
+            LOG.info(
+                    "The {} table type is unique model, the two phase commit default value should be disabled.",
+                    tableName);
+            dorisOptions.setEnable2PC(false);
+        }
     }
 
     public void fetchOffset() {
