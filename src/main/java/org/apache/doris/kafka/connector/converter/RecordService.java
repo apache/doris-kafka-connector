@@ -84,16 +84,16 @@ public class RecordService {
         this.dorisTableDescriptorCache = new HashMap<>();
     }
 
-    /**
-     * process struct record from debezium: { "schema": { "type": "struct", "fields": [ ...... ],
-     * "optional": false, "name": "" }, "payload": { "name": "doris", "__deleted": "true" } }
-     */
+    /** Process the kafka struct type record. */
     public String processStructRecord(SinkRecord record) {
         String processedRecord;
         if (ConverterMode.DEBEZIUM_INGESTION == dorisOptions.getConverterMode()) {
             validate(record);
             RecordDescriptor recordDescriptor = buildRecordDescriptor(record);
             if (recordDescriptor.isTombstone()) {
+                LOG.warn(
+                        "The record value and schema is null, will not process. recordOffset={}",
+                        record.kafkaOffset());
                 return null;
             }
             String tableName = dorisOptions.getTopicMapTable(recordDescriptor.getTopicName());

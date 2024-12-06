@@ -33,7 +33,6 @@ import org.apache.kafka.connect.sink.SinkRecord;
 public class RecordDescriptor {
     private final SinkRecord record;
     private final String topicName;
-    private final List<String> keyFieldNames;
     private final List<String> nonKeyFieldNames;
     private final Map<String, FieldDescriptor> fields;
     private final boolean flattened;
@@ -41,13 +40,11 @@ public class RecordDescriptor {
     private RecordDescriptor(
             SinkRecord record,
             String topicName,
-            List<String> keyFieldNames,
             List<String> nonKeyFieldNames,
             Map<String, FieldDescriptor> fields,
             boolean flattened) {
         this.record = record;
         this.topicName = topicName;
-        this.keyFieldNames = keyFieldNames;
         this.nonKeyFieldNames = nonKeyFieldNames;
         this.fields = fields;
         this.flattened = flattened;
@@ -63,10 +60,6 @@ public class RecordDescriptor {
 
     public long getOffset() {
         return record.kafkaOffset();
-    }
-
-    public List<String> getKeyFieldNames() {
-        return keyFieldNames;
     }
 
     public List<String> getNonKeyFieldNames() {
@@ -119,20 +112,14 @@ public class RecordDescriptor {
     public static class FieldDescriptor {
         private final Schema schema;
         private final String name;
-        private final Map<String, Type> typeRegistry;
         private final Type type;
         private final String typeName;
-        private final String schemaTypeName;
-        private final String schemaName;
         private String comment;
         private String defaultValue;
 
         public FieldDescriptor(Schema schema, String name, Map<String, Type> typeRegistry) {
             this.schema = schema;
             this.name = name;
-            this.typeRegistry = typeRegistry;
-            this.schemaName = schema.name();
-            this.schemaTypeName = schema.type().name();
             this.type =
                     typeRegistry.getOrDefault(
                             schema.name(), typeRegistry.get(schema.type().name()));
@@ -141,17 +128,6 @@ public class RecordDescriptor {
                         "Type not found in registry for schema: " + schema);
             }
             this.typeName = type.getTypeName(schema);
-        }
-
-        public FieldDescriptor(
-                Schema schema,
-                String name,
-                Map<String, Type> typeRegistry,
-                String comment,
-                String defaultValue) {
-            this(schema, name, typeRegistry);
-            this.comment = comment;
-            this.defaultValue = defaultValue;
         }
 
         public String getName() {
@@ -166,16 +142,8 @@ public class RecordDescriptor {
             return typeName;
         }
 
-        public String getSchemaName() {
-            return schemaName;
-        }
-
         public Schema getSchema() {
             return schema;
-        }
-
-        public String getSchemaTypeName() {
-            return schemaTypeName;
         }
 
         public String getComment() {
@@ -193,7 +161,6 @@ public class RecordDescriptor {
         private Map<String, Type> typeRegistry;
 
         // Internal build state
-        private final List<String> keyFieldNames = new ArrayList<>();
         private final List<String> nonKeyFieldNames = new ArrayList<>();
         private final Map<String, FieldDescriptor> allFields = new LinkedHashMap<>();
 
@@ -214,12 +181,7 @@ public class RecordDescriptor {
             readSinkRecordNonKeyData(sinkRecord, flattened);
 
             return new RecordDescriptor(
-                    sinkRecord,
-                    sinkRecord.topic(),
-                    keyFieldNames,
-                    nonKeyFieldNames,
-                    allFields,
-                    flattened);
+                    sinkRecord, sinkRecord.topic(), nonKeyFieldNames, allFields, flattened);
         }
 
         private boolean isFlattened(SinkRecord record) {
@@ -252,9 +214,7 @@ public class RecordDescriptor {
 
         private void applyNonKeyFields(Schema schema) {
             for (Field field : schema.fields()) {
-                if (!keyFieldNames.contains(field.name())) {
-                    applyNonKeyField(field.name(), field.schema());
-                }
+                applyNonKeyField(field.name(), field.schema());
             }
         }
 
