@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.StreamLoadException;
 import org.apache.doris.kafka.connector.model.KafkaRespContent;
@@ -56,14 +57,18 @@ public class DorisStreamLoad extends DataLoad {
     private final boolean enableGroupCommit;
 
     public DorisStreamLoad(BackendUtils backendUtils, DorisOptions dorisOptions, String topic) {
+        this.topic = topic;
         this.database = dorisOptions.getDatabase();
         this.table = dorisOptions.getTopicMapTable(topic);
+        if (StringUtils.isEmpty(table)) {
+            // The mapping of topic and table is not defined
+            this.table = this.topic;
+        }
         this.user = dorisOptions.getUser();
         this.password = dorisOptions.getPassword();
         this.loadUrl = String.format(LOAD_URL_PATTERN, hostPort, database, table);
         this.dorisOptions = dorisOptions;
         this.backendUtils = backendUtils;
-        this.topic = topic;
         this.enableGroupCommit = dorisOptions.enableGroupCommit();
     }
 
