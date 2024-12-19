@@ -44,6 +44,7 @@ public class DorisOptions {
     private final String password;
     private final String database;
     private final Map<String, String> topicMap;
+    private final String tableField;
     private final int fileSize;
     private final int recordNum;
     private final long flushTime;
@@ -91,6 +92,7 @@ public class DorisOptions {
         this.topicMap =
                 ConfigCheckUtils.parseTopicToTableMap(
                         config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP));
+        this.tableField = config.get(DorisSinkConnectorConfig.DORIS_TABLE_FIELD);
 
         if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
             if (Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC))) {
@@ -191,6 +193,10 @@ public class DorisOptions {
 
     public String getTopicMapTable(String topic) {
         return topicMap.get(topic);
+    }
+
+    public String getTableField() {
+        return tableField;
     }
 
     public boolean enable2PC() {

@@ -79,6 +79,7 @@ public class TestCopyIntoWriter {
                 spy(
                         new CopyIntoWriter(
                                 "connect-test299",
+                                "connect-test299",
                                 5,
                                 dorisOptions,
                                 new JdbcConnectionProvider(dorisOptions),
@@ -103,6 +104,7 @@ public class TestCopyIntoWriter {
         CopyIntoWriter copyIntoWriter =
                 new CopyIntoWriter(
                         "test5",
+                        "test5",
                         0,
                         dorisOptions,
                         new JdbcConnectionProvider(dorisOptions),
@@ -122,6 +124,7 @@ public class TestCopyIntoWriter {
         DorisConnectMonitor dorisConnectMonitor = mock(DorisConnectMonitor.class);
         dorisWriter =
                 new CopyIntoWriter(
+                        "test5",
                         "test5",
                         0,
                         dorisOptions,
