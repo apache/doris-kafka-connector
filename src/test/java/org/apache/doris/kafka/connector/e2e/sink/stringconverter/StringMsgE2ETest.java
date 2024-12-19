@@ -212,6 +212,42 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         checkResult(expected, query, 7);
     }
 
+    @Test
+    public void testTableFieldConfig() throws Exception {
+        initialize("src/test/resources/e2e/string_converter/table_field_config.json");
+        String topic = "table_field_config_test";
+        String msg1 =
+                "{\"id\":1,\"col1\":\"col1\",\"col2\":\"col2\",\"table_name\":\"field_config_tab1\"}";
+        String msg2 =
+                "{\"id\":1,\"col1\":\"col1\",\"col2\":\"col2\",\"table_name\":\"field_config_tab2\"}";
+
+        produceMsg2Kafka(topic, msg1);
+        produceMsg2Kafka(topic, msg2);
+
+        String tableSql1 =
+                loadContent("src/test/resources/e2e/string_converter/table_field_config1.sql");
+        createTable(tableSql1);
+        String tableSql2 =
+                loadContent("src/test/resources/e2e/string_converter/table_field_config2.sql");
+        createTable(tableSql2);
+
+        Thread.sleep(2000);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        List<String> expected = Collections.singletonList("1,col1,col2");
+        Thread.sleep(10000);
+        String query1 =
+                String.format(
+                        "select id,col1,col2 from %s.%s order by id",
+                        database, "field_config_tab1");
+        checkResult(expected, query1, 3);
+        String query2 =
+                String.format(
+                        "select id,col1,col2 from %s.%s order by id",
+                        database, "field_config_tab2");
+        checkResult(expected, query2, 3);
+    }
+
     public void checkResult(List<String> expected, String query, int columnSize) throws Exception {
         List<String> actual = new ArrayList<>();
 

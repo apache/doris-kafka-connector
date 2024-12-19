@@ -55,9 +55,10 @@ public class DorisStreamLoad extends DataLoad {
     private Queue<KafkaRespContent> respContents = new LinkedList<>();
     private final boolean enableGroupCommit;
 
-    public DorisStreamLoad(BackendUtils backendUtils, DorisOptions dorisOptions, String topic) {
+    public DorisStreamLoad(
+            BackendUtils backendUtils, DorisOptions dorisOptions, String topic, String table) {
         this.database = dorisOptions.getDatabase();
-        this.table = dorisOptions.getTopicMapTable(topic);
+        this.table = table;
         this.user = dorisOptions.getUser();
         this.password = dorisOptions.getPassword();
         this.loadUrl = String.format(LOAD_URL_PATTERN, hostPort, database, table);

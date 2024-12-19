@@ -56,18 +56,20 @@ public class StreamLoadWriter extends DorisWriter {
     private DorisStreamLoad dorisStreamLoad;
 
     public StreamLoadWriter(
+            String tableName,
             String topic,
             int partition,
             DorisOptions dorisOptions,
             ConnectionProvider connectionProvider,
             DorisConnectMonitor connectMonitor) {
-        super(topic, partition, dorisOptions, connectionProvider, connectMonitor);
+        super(tableName, topic, partition, dorisOptions, connectionProvider, connectMonitor);
         this.taskId = dorisOptions.getTaskId();
         this.labelGenerator = new LabelGenerator(topic, partition, tableIdentifier);
         BackendUtils backendUtils = BackendUtils.getInstance(dorisOptions, LOG);
         this.dorisCommitter = new DorisCommitter(dorisOptions, backendUtils);
-        this.dorisStreamLoad = new DorisStreamLoad(backendUtils, dorisOptions, topic);
-        checkDorisTableKey(tableName);
+        this.dorisStreamLoad =
+                new DorisStreamLoad(backendUtils, dorisOptions, topic, this.tableName);
+        checkDorisTableKey(this.tableName);
     }
 
     /** The uniq model has 2pc close by default unless 2pc is forced open. */
