@@ -60,6 +60,7 @@ public abstract class DorisWriter {
     protected final DorisConnectMonitor connectMonitor;
 
     public DorisWriter(
+            String tableName,
             String topic,
             int partition,
             DorisOptions dorisOptions,
@@ -67,11 +68,7 @@ public abstract class DorisWriter {
             DorisConnectMonitor connectMonitor) {
         this.topic = topic;
         this.partition = partition;
-        this.tableName = dorisOptions.getTopicMapTable(topic);
-        if (StringUtils.isEmpty(tableName)) {
-            // The mapping of topic and table is not defined
-            this.tableName = this.topic;
-        }
+        this.tableName = tableName;
         if (StringUtils.isNotEmpty(dorisOptions.getDatabase())) {
             this.dbName = dorisOptions.getDatabase();
         } else if (tableName.contains(".")) {
@@ -83,7 +80,7 @@ public abstract class DorisWriter {
             throw new ArgumentsException("Failed to get database and table names");
         }
 
-        this.tableIdentifier = dbName + "." + tableName;
+        this.tableIdentifier = dbName + "." + this.tableName;
         this.fileNames = new ArrayList<>();
         this.buffer = new RecordBuffer();
         this.processedOffset = new AtomicLong(-1);

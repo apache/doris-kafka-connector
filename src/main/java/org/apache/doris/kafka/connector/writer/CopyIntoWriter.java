@@ -45,15 +45,16 @@ public class CopyIntoWriter extends DorisWriter {
     private final String prefix;
 
     public CopyIntoWriter(
+            String tableName,
             String topic,
             int partition,
             DorisOptions dorisOptions,
             ConnectionProvider connectionProvider,
             DorisConnectMonitor connectMonitor) {
-        super(topic, partition, dorisOptions, connectionProvider, connectMonitor);
+        super(tableName, topic, partition, dorisOptions, connectionProvider, connectMonitor);
         this.taskId = dorisOptions.getTaskId();
         this.prefix = FileNameUtils.filePrefix(dorisOptions.getName(), topic, partition);
-        this.copyLoad = new CopyLoad(dbName, tableName, dorisOptions);
+        this.copyLoad = new CopyLoad(dbName, this.tableName, dorisOptions);
     }
 
     public void fetchOffset() {
