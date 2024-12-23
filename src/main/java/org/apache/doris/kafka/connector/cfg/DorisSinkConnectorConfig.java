@@ -52,7 +52,7 @@ public class DorisSinkConnectorConfig {
     public static final long BUFFER_SIZE_BYTES_DEFAULT = 5000000;
     public static final long BUFFER_SIZE_BYTES_MIN = 1;
     public static final String TOPICS_TABLES_MAP = "doris.topic2table.map";
-    public static final String DORIS_TABLE_FIELD = "doris.table.field";
+    public static final String RECORD_TABLE_NAME_FIELD = "record.tablename.field";
     public static final String LABEL_PREFIX = "label.prefix";
 
     // Time in seconds
@@ -244,15 +244,15 @@ public class DorisSinkConnectorConfig {
                         ConfigDef.Width.NONE,
                         BUFFER_FLUSH_TIME_SEC)
                 .define(
-                        DORIS_TABLE_FIELD,
+                        RECORD_TABLE_NAME_FIELD,
                         Type.STRING,
                         null,
                         Importance.LOW,
-                        "The field name of the Doris table to which the data is written",
+                        "The field name of record, and use this field value as the table name to be written",
                         CONNECTOR_CONFIG,
                         4,
                         ConfigDef.Width.NONE,
-                        DORIS_TABLE_FIELD)
+                        RECORD_TABLE_NAME_FIELD)
                 .define(
                         JMX_OPT,
                         ConfigDef.Type.BOOLEAN,

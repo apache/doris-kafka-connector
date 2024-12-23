@@ -20,6 +20,7 @@
 package org.apache.doris.kafka.connector.service;
 
 import com.codahale.metrics.MetricRegistry;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -75,7 +76,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
 
     @Override
     public void startTask(TopicPartition topicPartition) {
-        startTask(getTopicMapTableInConfig(topicPartition.topic()), topicPartition);
+        startTask(dorisOptions.getTopicMapTable(topicPartition.topic()), topicPartition);
     }
 
     /**
@@ -188,40 +189,32 @@ public class DorisDefaultSinkService implements DorisSinkService {
     }
 
     /**
-     * Get the table name in doris for the given topic. If the table name is not found in the
-     * config, use the topic name as the table name.
-     *
-     * @param topic topic name
-     * @return table name in doris
-     */
-    private String getTopicMapTableInConfig(String topic) {
-        String table = dorisOptions.getTopicMapTable(topic);
-        if (StringUtils.isEmpty(table)) {
-            return topic;
-        }
-        return table;
-    }
-
-    /**
      * Get the table name in doris for the given record.
      *
      * @param record sink record
      * @return table name in doris
      */
-    private String getSinkDorisTableName(SinkRecord record) {
-        String defaultTableName = getTopicMapTableInConfig(record.topic());
-        String field = dorisOptions.getTableField();
+    @VisibleForTesting
+    public String getSinkDorisTableName(SinkRecord record) {
+        String defaultTableName = dorisOptions.getTopicMapTable(record.topic());
+        String field = dorisOptions.getTableNameField();
         // if the field is not set, use the table name in the config
         if (StringUtils.isEmpty(field)) {
             return defaultTableName;
         }
         if (!(record.value() instanceof Map)) {
-            LOG.warn("Only Map objects supported for The 'doris.table.field' configuration");
+            LOG.warn(
+                    "Only Map objects supported for The 'record.tablename.field' configuration, field={}, record type={}",
+                    field,
+                    record.value().getClass().getName());
             return defaultTableName;
         }
         Map<String, Object> map = (Map<String, Object>) record.value();
         // if the field is not found in the record, use the table name in the config
-        return map.getOrDefault(field, defaultTableName).toString();
+        if (map.get(field) == null) {
+            return defaultTableName;
+        }
+        return map.get(field).toString();
     }
 
     private static String getNameIndex(String topic, int partition) {
@@ -236,7 +229,10 @@ public class DorisDefaultSinkService implements DorisSinkService {
      * @param tableName table name
      * @return writer key
      */
-    private static String getWriterKey(String topic, int partition, String tableName) {
+    private String getWriterKey(String topic, int partition, String tableName) {
+        if (dorisOptions.getTopicMapTable(topic).equals(tableName)) {
+            return topic + "_" + partition;
+        }
         return topic + "_" + partition + "_" + tableName;
     }
 }

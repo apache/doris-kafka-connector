@@ -14,7 +14,7 @@
     "doris.http.port":"8030",
     "doris.query.port":"9030",
     "doris.database":"string_msg",
-    "doris.table.field": "table_name",
+    "record.tablename.field": "table_name",
     "enable.2pc": "false",
     "load.model":"stream_load",
     "key.converter":"org.apache.kafka.connect.storage.StringConverter",
