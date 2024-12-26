@@ -135,6 +135,12 @@ public abstract class DorisWriter {
             if (tmpBuff != null) {
                 flush(tmpBuff);
             }
+        } else {
+            LOG.warn(
+                    "The record offset is smaller than processedOffset. recordOffset={}, offsetPersistedInDoris={}, processedOffset={}",
+                    record.kafkaOffset(),
+                    offsetPersistedInDoris.get(),
+                    processedOffset.get());
         }
     }
 
