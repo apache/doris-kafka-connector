@@ -20,8 +20,11 @@
 package org.apache.doris.kafka.connector.service;
 
 import com.codahale.metrics.MetricRegistry;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +42,7 @@ import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,9 +64,11 @@ public class DorisDefaultSinkService implements DorisSinkService {
     private final DorisOptions dorisOptions;
     private final MetricsJmxReporter metricsJmxReporter;
     private final DorisConnectMonitor connectMonitor;
+    private final ObjectMapper objectMapper;
 
     DorisDefaultSinkService(Map<String, String> config) {
         this.dorisOptions = new DorisOptions(config);
+        this.objectMapper = new ObjectMapper();
         this.writer = new HashMap<>();
         this.conn = new JdbcConnectionProvider(dorisOptions);
         MetricRegistry metricRegistry = new MetricRegistry();
@@ -202,19 +208,36 @@ public class DorisDefaultSinkService implements DorisSinkService {
         if (StringUtils.isEmpty(field)) {
             return defaultTableName;
         }
-        if (!(record.value() instanceof Map)) {
+        return parseRecordTableName(defaultTableName, field, record);
+    }
+
+    private String parseRecordTableName(
+            String defaultTableName, String tableNameField, SinkRecord record) {
+        Object recordValue = record.value();
+        Map<String, Object> recordMap = Collections.emptyMap();
+        if (recordValue instanceof Struct) {
             LOG.warn(
-                    "Only Map objects supported for The 'record.tablename.field' configuration, field={}, record type={}",
-                    field,
-                    record.value().getClass().getName());
+                    "The Struct type record not supported for The 'record.tablename.field' configuration, field={}",
+                    tableNameField);
             return defaultTableName;
+        } else if (recordValue instanceof Map) {
+            recordMap = (Map<String, Object>) recordValue;
+        } else if (recordValue instanceof String) {
+            try {
+                recordMap = objectMapper.readValue((String) recordValue, Map.class);
+            } catch (JsonProcessingException e) {
+                LOG.warn(
+                        "The String type record failed to parse record value to map. record={}, field={}",
+                        recordValue,
+                        tableNameField,
+                        e);
+            }
         }
-        Map<String, Object> map = (Map<String, Object>) record.value();
         // if the field is not found in the record, use the table name in the config
-        if (map.get(field) == null) {
+        if (!recordMap.containsKey(tableNameField)) {
             return defaultTableName;
         }
-        return map.get(field).toString();
+        return recordMap.get(tableNameField).toString();
     }
 
     private static String getNameIndex(String topic, int partition) {
