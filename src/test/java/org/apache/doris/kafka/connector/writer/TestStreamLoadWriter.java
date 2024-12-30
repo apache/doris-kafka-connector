@@ -100,6 +100,7 @@ public class TestStreamLoadWriter {
                 spy(
                         new StreamLoadWriter(
                                 "avro-complex10",
+                                "avro-complex10",
                                 2,
                                 dorisOptions,
                                 new JdbcConnectionProvider(dorisOptions),
@@ -131,6 +132,7 @@ public class TestStreamLoadWriter {
         StreamLoadWriter streamLoadWriter =
                 new StreamLoadWriter(
                         "avro-complex10",
+                        "avro-complex10",
                         0,
                         dorisOptions,
                         new JdbcConnectionProvider(dorisOptions),
@@ -155,6 +157,7 @@ public class TestStreamLoadWriter {
         DorisConnectMonitor dorisConnectMonitor = mock(DorisConnectMonitor.class);
         dorisWriter =
                 new StreamLoadWriter(
+                        "avro-complex10",
                         "avro-complex10",
                         0,
                         dorisOptions,
