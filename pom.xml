@@ -29,7 +29,7 @@
     </parent>
     <groupId>org.apache.doris</groupId>
     <artifactId>doris-kafka-connector</artifactId>
-    <version>${revision}</version>
+    <version>24.0.0</version>
     <packaging>jar</packaging>
     <name>Doris-Kafka-Connector</name>
     <description>Doris Kafka Connector</description>
@@ -72,7 +72,7 @@
 
     <!-- Set our Language Level to Java 8 -->
     <properties>
-        <revision>24.0.0-SNAPSHOT</revision>
+        <revision>24.0.0</revision>
         <maven-compiler-plugin.version>3.10.1</maven-compiler-plugin.version>
         <maven-javadoc-plugin.version>3.3.0</maven-javadoc-plugin.version>
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
