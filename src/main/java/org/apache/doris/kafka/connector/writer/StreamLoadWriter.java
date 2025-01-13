@@ -49,7 +49,7 @@ public class StreamLoadWriter extends DorisWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreamLoadWriter.class);
     private static final String TRANSACTION_LABEL_PATTEN =
-            "SHOW TRANSACTION FROM %s WHERE LABEL LIKE '";
+            "SHOW TRANSACTION FROM %s WHERE LABEL LIKE '%s%%'";
     private List<DorisCommittable> committableList = new LinkedList<>();
     private final LabelGenerator labelGenerator;
     private final DorisCommitter dorisCommitter;
@@ -110,18 +110,11 @@ public class StreamLoadWriter extends DorisWriter {
      */
     @VisibleForTesting
     public Map<String, String> fetchLabel2Status() {
-        String queryPatten = String.format(TRANSACTION_LABEL_PATTEN, dorisOptions.getDatabase());
-        String tmpTableIdentifier = tableIdentifier.replaceAll("\\.", "_");
-        String tmpTopic = topic.replaceAll("\\.", "_");
         String querySQL =
-                queryPatten
-                        + tmpTopic
-                        + LoadConstants.FILE_DELIM_DEFAULT
-                        + partition
-                        + LoadConstants.FILE_DELIM_DEFAULT
-                        + tmpTableIdentifier
-                        + LoadConstants.FILE_DELIM_DEFAULT
-                        + "%'";
+                String.format(
+                        TRANSACTION_LABEL_PATTEN,
+                        dorisOptions.getDatabase(),
+                        labelGenerator.buildLabelPrefix());
         LOG.info("query doris offset by sql: {}", querySQL);
         Map<String, String> label2Status = new HashMap<>();
         try (Connection connection = connectionProvider.getOrEstablishConnection();

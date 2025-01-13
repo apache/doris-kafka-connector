@@ -31,8 +31,8 @@ import org.slf4j.LoggerFactory;
 public class JdbcConnectionProvider implements ConnectionProvider, Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(JdbcConnectionProvider.class);
-    protected final String driverName = "com.mysql.jdbc.Driver";
-    protected final String cjDriverName = "com.mysql.cj.jdbc.Driver";
+    protected static final String DRIVER_NAME = "com.mysql.jdbc.Driver";
+    protected static final String CJ_DRIVER_NAME = "com.mysql.cj.jdbc.Driver";
     private static final String JDBC_URL_TEMPLATE = "jdbc:mysql://%s";
 
     private static final long serialVersionUID = 1L;
@@ -51,11 +51,11 @@ public class JdbcConnectionProvider implements ConnectionProvider, Serializable 
             return connection;
         }
         try {
-            Class.forName(cjDriverName);
+            Class.forName(CJ_DRIVER_NAME);
         } catch (ClassNotFoundException ex) {
             LOG.warn(
                     "can not found class com.mysql.cj.jdbc.Driver, use class com.mysql.jdbc.Driver");
-            Class.forName(driverName);
+            Class.forName(DRIVER_NAME);
         }
         String jdbcUrl = String.format(JDBC_URL_TEMPLATE, options.getQueryUrl());
         if (!Objects.isNull(options.getUser())) {

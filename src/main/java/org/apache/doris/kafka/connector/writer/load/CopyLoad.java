@@ -134,7 +134,7 @@ public class CopyLoad extends DataLoad {
                                     return true;
                                 }
                             }
-                            LOG.error("commit failed, cause by: " + loadResult);
+                            LOG.error("commit failed, cause by: {}", loadResult);
                             throw new CopyLoadException("commit failed, cause by: " + loadResult);
                         }
                     });

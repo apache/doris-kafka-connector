@@ -81,7 +81,7 @@ public class DorisConnectMonitor {
         // partition reassignment
         LOG.debug(
                 "Registering metrics existing:{}",
-                metricsJmxReporter.getMetricRegistry().getMetrics().keySet().toString());
+                metricsJmxReporter.getMetricRegistry().getMetrics().keySet());
         metricsJmxReporter.removeMetricsFromRegistry(String.valueOf(taskId));
 
         try {

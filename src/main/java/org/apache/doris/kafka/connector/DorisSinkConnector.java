@@ -79,7 +79,7 @@ public class DorisSinkConnector extends SinkConnector {
         List<Map<String, String>> taskConfigs = new ArrayList<>(maxTasks);
         for (int i = 0; i < maxTasks; i++) {
             Map<String, String> conf = new HashMap<>(config);
-            conf.put(ConfigCheckUtils.TASK_ID, i + "");
+            conf.put(ConfigCheckUtils.TASK_ID, String.valueOf(i));
             taskConfigs.add(conf);
         }
         return taskConfigs;

@@ -89,7 +89,7 @@ public class MetricsJmxReporter {
                     "Metric registry:{}, size is:{}, names:{}",
                     prefixFilter,
                     metricRegistry.getMetrics().size(),
-                    metricRegistry.getMetrics().keySet().toString());
+                    metricRegistry.getMetrics().keySet());
         }
     }
 

@@ -32,7 +32,7 @@ public class BackoffAndRetryUtils {
     private static final int[] backoffSec = {0, 1, 2, 4};
 
     /** Interfaces to define the lambda function to be used by backoffAndRetry */
-    public interface backoffFunction {
+    public interface BackoffFunction {
         Object apply() throws Exception;
     }
 
@@ -45,7 +45,7 @@ public class BackoffAndRetryUtils {
      * @throws Exception if the runnable function throws exception
      */
     public static Object backoffAndRetry(
-            final LoadOperation operation, final backoffFunction runnable) throws Exception {
+            final LoadOperation operation, final BackoffFunction runnable) throws Exception {
         for (final int iteration : backoffSec) {
             if (iteration != 0) {
                 Thread.sleep(iteration * 1000L);
