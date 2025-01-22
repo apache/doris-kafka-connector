@@ -85,8 +85,7 @@ public class RestService {
                 HttpGet httpGet = new HttpGet(beUrl);
                 String response = send(options, httpGet, logger);
                 logger.info("Backend Info:{}", response);
-                List<BackendV2.BackendRowV2> backends = parseBackendV2(response, logger);
-                return backends;
+                return parseBackendV2(response, logger);
             } catch (ConnectedFailedException e) {
                 logger.info(
                         "Doris FE node {} is unavailable: {}, Request the next Doris FE node",
@@ -313,7 +312,7 @@ public class RestService {
     /** Get table schema from doris. */
     public static Schema getSchema(
             DorisOptions dorisOptions, String db, String table, Logger logger) {
-        logger.trace("start get " + db + "." + table + " schema from doris.");
+        logger.trace("start get {}.{} schema from doris.", db, table);
         Object responseData = null;
         try {
             String tableSchemaUri =

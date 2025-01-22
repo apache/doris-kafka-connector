@@ -21,7 +21,6 @@ package org.apache.doris.kafka.connector.writer.commit;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,15 +60,11 @@ public class DorisCommitter {
             return;
         }
         for (DorisCommittable dorisCommittable : dorisCommittables) {
-            try {
-                commitTransaction(dorisCommittable);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            commitTransaction(dorisCommittable);
         }
     }
 
-    private void commitTransaction(DorisCommittable committable) throws IOException {
+    private void commitTransaction(DorisCommittable committable) {
         // basic params
         HttpPutBuilder builder =
                 new HttpPutBuilder()
