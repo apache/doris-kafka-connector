@@ -184,7 +184,7 @@ public class RecordService {
                     "Table '{}' cannot be altered because schema evolution is disabled.",
                     tableName);
             throw new SchemaChangeException(
-                    "Cannot alter table " + table + " because schema evolution is disabled");
+                    "Cannot alter table " + tableName + " because schema evolution is disabled");
         }
         for (RecordDescriptor.FieldDescriptor missingField : missingFields) {
             schemaChangeManager.addColumnDDL(tableName, missingField);
