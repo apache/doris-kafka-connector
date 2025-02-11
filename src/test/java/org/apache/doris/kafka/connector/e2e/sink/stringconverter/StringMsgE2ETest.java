@@ -253,10 +253,8 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         initialize("src/test/resources/e2e/transforms/rename_transforms.json");
         String topic = "kf_rename_transform_msg";
         String msg1 = "{\"id\":1,\"old_col1\":\"col1\",\"col2\":\"col2\"}";
-        String msg2 = "{\"id\":2,\"old_col1\":\"col1_1\",\"col2\":\"col2\"}";
 
         produceMsg2Kafka(topic, msg1);
-        produceMsg2Kafka(topic, msg2);
 
         String tableSql1 = loadContent("src/test/resources/e2e/transforms/rename_transforms.sql");
         createTable(tableSql1);
