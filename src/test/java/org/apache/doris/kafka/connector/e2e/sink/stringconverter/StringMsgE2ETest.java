@@ -250,24 +250,21 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
 
     @Test
     public void testRenameTransform() throws Exception {
-        initialize("src/test/resources/e2e/string_converter/table_field_config.json");
+        initialize("src/test/resources/e2e/transforms/rename_transforms.json");
         String topic = "kf_rename_transform_msg";
-        String msg1 =
-                "{\"id\":1,\"old_col1\":\"col1\",\"col2\":\"col2\"}";
-        String msg2 =
-                "{\"id\":2,\"old_col1\":\"col1_1\",\"col2\":\"col2\"}";
+        String msg1 = "{\"id\":1,\"old_col1\":\"col1\",\"col2\":\"col2\"}";
+        String msg2 = "{\"id\":2,\"old_col1\":\"col1_1\",\"col2\":\"col2\"}";
 
         produceMsg2Kafka(topic, msg1);
         produceMsg2Kafka(topic, msg2);
 
-        String tableSql1 =
-                loadContent("src/test/resources/e2e/transforms/rename_transform.json");
+        String tableSql1 = loadContent("src/test/resources/e2e/transforms/rename_transforms.sql");
         createTable(tableSql1);
 
         Thread.sleep(2000);
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
 
-        List<String> expectedResult = Arrays.asList("1,col1,col2","2,col1_1,col2");
+        List<String> expectedResult = Arrays.asList("1,col1,col2", "2,col1_1,col2");
         Thread.sleep(10000);
         String query1 =
                 String.format(
