@@ -20,15 +20,6 @@
 package org.apache.doris.kafka.connector.e2e.sink.stringconverter;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
@@ -40,6 +31,16 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
     private static final Logger LOG = LoggerFactory.getLogger(StringMsgE2ETest.class);
@@ -190,6 +191,42 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         checkResult(expected, query, 51);
     }
 
+
+    @Test
+    public void testDebeziumIngestionDMLEvent() throws Exception {
+        initialize("src/test/resources/e2e/string_converter/debezium_dml_event.json");
+        String insert1 = "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"age\"}],\"optional\":true,\"name\":\"mysql-server-1.inventory.customers.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"age\"}],\"optional\":true,\"name\":\"mysql-server-1.inventory.customers.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ns\"},{\"type\":\"boolean\",\"optional\":true,\"default\":false,\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"server_id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"gtid\"},{\"type\":\"string\",\"optional\":false,\"field\":\"file\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"pos\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"row\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"thread\"},{\"type\":\"string\",\"optional\":true,\"field\":\"query\"}],\"optional\":false,\"name\":\"io.debezium.connector.mysql.Source\",\"field\":\"source\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ns\"}],\"optional\":false,\"name\":\"mysql-server-1.inventory.customers.Envelope\"},\"payload\":{\"op\":\"c\",\"ts_ms\":1465491411815,\"ts_us\":1465491411815437,\"ts_ns\":1465491411815437158,\"before\":null,\"after\":{\"id\":1,\"name\":\"zhangsan\",\"age\":18},\"source\":{\"version\":\"3.0.8.Final\",\"connector\":\"mysql\",\"name\":\"mysql-server-1\",\"ts_ms\":0,\"ts_us\":0,\"ts_ns\":0,\"snapshot\":false,\"db\":\"inventory\",\"table\":\"customers\",\"server_id\":0,\"gtid\":null,\"file\":\"mysql-bin.000003\",\"pos\":154,\"row\":0,\"thread\":7}}}";
+        String topic = "debezium_dml_event";
+        produceMsg2Kafka(topic, insert1);
+        String tableSql =
+                loadContent(
+                        "src/test/resources/e2e/string_converter/debezium_dml_event_tab.sql");
+        createTable(tableSql);
+        Thread.sleep(2000);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        String table = dorisOptions.getTopicMapTable(topic);
+        List<String> expected =
+                Arrays.asList("1,zhangsan,18");
+        Thread.sleep(10000);
+        String query = String.format("select * from %s.%s order by id", database, table);
+        checkResult(expected, query, 3);
+
+        //update
+        String update = "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"age\"}],\"optional\":true,\"name\":\"mysql-server-1.inventory.customers.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"age\"}],\"optional\":true,\"name\":\"mysql-server-1.inventory.customers.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ns\"},{\"type\":\"boolean\",\"optional\":true,\"default\":false,\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"server_id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"gtid\"},{\"type\":\"string\",\"optional\":false,\"field\":\"file\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"pos\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"row\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"thread\"},{\"type\":\"string\",\"optional\":true,\"field\":\"query\"}],\"optional\":false,\"name\":\"io.debezium.connector.mysql.Source\",\"field\":\"source\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ns\"}],\"optional\":false,\"name\":\"mysql-server-1.inventory.customers.Envelope\"},\"payload\":{\"op\":\"u\",\"ts_ms\":1465491411815,\"ts_us\":1465491411815437,\"ts_ns\":1465491411815437158,\"before\":{\"id\":1,\"name\":\"zhangsan\",\"age\":18},\"after\":{\"id\":1,\"name\":\"zhangsan\",\"age\":48},\"source\":{\"version\":\"3.0.8.Final\",\"connector\":\"mysql\",\"name\":\"mysql-server-1\",\"ts_ms\":0,\"ts_us\":0,\"ts_ns\":0,\"snapshot\":false,\"db\":\"inventory\",\"table\":\"customers\",\"server_id\":0,\"gtid\":null,\"file\":\"mysql-bin.000003\",\"pos\":154,\"row\":0,\"thread\":7}}}";
+        produceMsg2Kafka(topic, update);
+        Thread.sleep(10000);
+        List<String> expectedUpdate =
+                Arrays.asList("1,zhangsan,48");
+        checkResult(expectedUpdate, query, 3);
+
+        //delete
+        String delete = "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"age\"}],\"optional\":true,\"name\":\"mysql-server-1.inventory.customers.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"age\"}],\"optional\":true,\"name\":\"mysql-server-1.inventory.customers.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ns\"},{\"type\":\"boolean\",\"optional\":true,\"default\":false,\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"server_id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"gtid\"},{\"type\":\"string\",\"optional\":false,\"field\":\"file\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"pos\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"row\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"thread\"},{\"type\":\"string\",\"optional\":true,\"field\":\"query\"}],\"optional\":false,\"name\":\"io.debezium.connector.mysql.Source\",\"field\":\"source\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_us\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ns\"}],\"optional\":false,\"name\":\"mysql-server-1.inventory.customers.Envelope\"},\"payload\":{\"op\":\"d\",\"ts_ms\":1465491411815,\"ts_us\":1465491411815437,\"ts_ns\":1465491411815437158,\"before\":{\"id\":1,\"name\":\"zhangsan\",\"age\":48},\"source\":{\"version\":\"3.0.8.Final\",\"connector\":\"mysql\",\"name\":\"mysql-server-1\",\"ts_ms\":0,\"ts_us\":0,\"ts_ns\":0,\"snapshot\":false,\"db\":\"inventory\",\"table\":\"customers\",\"server_id\":0,\"gtid\":null,\"file\":\"mysql-bin.000003\",\"pos\":154,\"row\":0,\"thread\":7}}}";
+        produceMsg2Kafka(topic, delete);
+        Thread.sleep(10000);
+        List<String> expectedDelete = Arrays.asList();
+        checkResult(expectedDelete, query, 3);
+    }
     @Test
     public void testTimeExampleTypes() throws Exception {
         initialize("src/test/resources/e2e/string_converter/time_types.json");
