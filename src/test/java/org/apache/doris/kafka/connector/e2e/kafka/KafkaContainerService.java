@@ -25,6 +25,10 @@ public interface KafkaContainerService {
 
     void startContainer();
 
+    void startSchemaRegistry();
+
+    String getSchemaRegistryUrl();
+
     void startConnector();
 
     String getInstanceHostAndPort();

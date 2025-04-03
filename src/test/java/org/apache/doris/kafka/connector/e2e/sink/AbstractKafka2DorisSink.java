@@ -28,8 +28,12 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -39,6 +43,7 @@ import org.apache.doris.kafka.connector.e2e.kafka.KafkaContainerService;
 import org.apache.doris.kafka.connector.e2e.kafka.KafkaContainerServiceImpl;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +75,17 @@ public abstract class AbstractKafka2DorisSink {
         kafkaContainerService.startContainer();
         kafkaContainerService.startConnector();
         kafkaInstanceHostAndPort = kafkaContainerService.getInstanceHostAndPort();
+    }
+
+    protected static void initSchemaRegistry() {
+        if (Objects.isNull(kafkaContainerService)) {
+            return;
+        }
+        kafkaContainerService.startSchemaRegistry();
+    }
+
+    protected static String getSchemaRegistryUrl() {
+        return kafkaContainerService.getSchemaRegistryUrl();
     }
 
     protected static Connection getJdbcConnection() {
@@ -154,5 +170,28 @@ public abstract class AbstractKafka2DorisSink {
     public static void close() {
         kafkaContainerService.close();
         dorisContainerService.close();
+    }
+
+    public void checkResult(List<String> expected, String query, int columnSize) throws Exception {
+        List<String> actual = new ArrayList<>();
+
+        try (Statement statement = getJdbcConnection().createStatement()) {
+            ResultSet sinkResultSet = statement.executeQuery(query);
+            while (sinkResultSet.next()) {
+                List<String> row = new ArrayList<>();
+                for (int i = 1; i <= columnSize; i++) {
+                    Object value = sinkResultSet.getObject(i);
+                    if (value == null) {
+                        row.add("null");
+                    } else {
+                        row.add(value.toString());
+                    }
+                }
+                actual.add(StringUtils.join(row, ","));
+            }
+        }
+        LOG.info("expected result: {}", Arrays.toString(expected.toArray()));
+        LOG.info("actual result: {}", Arrays.toString(actual.toArray()));
+        Assert.assertArrayEquals(expected.toArray(), actual.toArray());
     }
 }

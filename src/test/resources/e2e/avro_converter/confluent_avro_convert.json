@@ -1,0 +1,23 @@
+{
+  "name":"confluent-avro-test",
+  "config":{
+  "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+  "topics":"avro-user",
+  "tasks.max":"1",
+  "doris.topic2table.map": "avro-user:confluent_avro_tab",
+  "buffer.count.records":"1",
+  "buffer.flush.time":"10",
+  "buffer.size.bytes":"10000000",
+  "doris.urls":"127.0.0.1",
+  "doris.user":"root",
+  "doris.password":"",
+  "doris.http.port":"8030",
+  "doris.query.port":"9030",
+  "doris.database":"avro_convert",
+  "load.model":"stream_load",
+  "key.converter":"io.confluent.connect.avro.AvroConverter",
+  "key.converter.schema.registry.url":"http://127.0.0.1:8081",
+  "value.converter":"io.confluent.connect.avro.AvroConverter",
+  "value.converter.schema.registry.url":"http://127.0.0.1:8081"
+  }
+}
