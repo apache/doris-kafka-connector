@@ -95,7 +95,6 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
         configNode.put("key.converter.schema.registry.url", getSchemaRegistryUrl());
         configNode.put("value.converter.schema.registry.url", getSchemaRegistryUrl());
         jsonMsgConnectorContent = new ObjectMapper().writeValueAsString(jsonNode);
-        Thread.sleep(5000);
 
         String topic = "avro-user";
         Schema.Parser parser = new Schema.Parser();
@@ -117,7 +116,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
                 loadContent("src/test/resources/e2e/avro_converter/confluent_avro_tab.sql");
         createTable(tableSql);
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
-        Thread.sleep(25000);
+        Thread.sleep(30000);
 
         String table = dorisOptions.getTopicMapTable(topic);
         List<String> expected = Arrays.asList("3,kafka-confluent,38", "4,doris-confluent,58");
@@ -140,8 +139,6 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
                 "value.converter.avro.topic2schema.filepath", "avro-user:file://" + absolutePath);
         jsonMsgConnectorContent = new ObjectMapper().writeValueAsString(jsonNode);
 
-        Thread.sleep(5000);
-
         String topic = "avro-user";
         Schema.Parser parser = new Schema.Parser();
         Schema schema = parser.parse(loadContent("src/test/resources/decode/avro/user.avsc"));
@@ -161,7 +158,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
         String tableSql = loadContent("src/test/resources/e2e/avro_converter/doris_avro_tab.sql");
         createTable(tableSql);
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
-        Thread.sleep(25000);
+        Thread.sleep(30000);
 
         String table = dorisOptions.getTopicMapTable(topic);
         List<String> expected = Arrays.asList("1,kafka,30", "2,doris,18");
