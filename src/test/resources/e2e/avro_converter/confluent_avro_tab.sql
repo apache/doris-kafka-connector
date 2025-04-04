@@ -1,4 +1,4 @@
-CREATE TABLE avro_convert.confluent_avro_tab
+CREATE TABLE confluent_avro_convert.confluent_avro_tab
 (
     `id`    INT,
     `name`  VARCHAR(256),

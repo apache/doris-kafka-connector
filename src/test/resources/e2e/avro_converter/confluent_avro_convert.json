@@ -13,7 +13,7 @@
   "doris.password":"",
   "doris.http.port":"8030",
   "doris.query.port":"9030",
-  "doris.database":"avro_convert",
+  "doris.database":"confluent_avro_convert",
   "load.model":"stream_load",
   "key.converter":"io.confluent.connect.avro.AvroConverter",
   "key.converter.schema.registry.url":"http://127.0.0.1:8081",

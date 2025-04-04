@@ -43,8 +43,11 @@ import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
+    private static final Logger LOG = LoggerFactory.getLogger(AvroMsgE2ETest.class);
     private static String connectorName;
     private static String jsonMsgConnectorContent;
     private static DorisOptions dorisOptions;
@@ -53,7 +56,6 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
     @BeforeClass
     public static void setUp() {
         initServer();
-        initSchemaRegistry();
     }
 
     public static void initialize(String connectorPath) {
@@ -83,6 +85,8 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
 
     @Test
     public void testConfluentAvroConvert() throws Exception {
+        LOG.info("starting to testConfluentAvroConvert test");
+        initSchemaRegistry();
         initAvroProducer();
         initialize("src/test/resources/e2e/avro_converter/confluent_avro_convert.json");
 
@@ -126,6 +130,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
 
     @Test
     public void testDorisAvroConvert() throws Exception {
+        LOG.info("starting to testDorisAvroConvert test");
         initByteProducer();
         initialize("src/test/resources/e2e/avro_converter/doris_avro_convert.json");
         // replace file path
