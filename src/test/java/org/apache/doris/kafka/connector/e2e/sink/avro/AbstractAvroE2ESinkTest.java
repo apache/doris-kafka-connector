@@ -71,17 +71,28 @@ public abstract class AbstractAvroE2ESinkTest extends AbstractKafka2DorisSink {
     }
 
     protected void produceMsg2Kafka(String topic, GenericRecord value) {
-        LOG.info("Kafka producer will produce msg. topic={}, msg={}", topic, value);
+        LOG.info("Kafka avro producer will produce msg. topic={}, msg={}", topic, value);
         ProducerRecord<String, GenericRecord> record = new ProducerRecord<>(topic, value);
-        avroProducer.send(record);
-        LOG.info("Kafka producer produced msg successfully. topic={}, msg={}", topic, value);
+        avroProducer.send(
+                record,
+                (recordMetadata, e) ->
+                        LOG.info(
+                                "Send avro Callback is {}, with error is ",
+                                recordMetadata.offset(),
+                                e));
+        LOG.info("Kafka avro producer produced msg successfully. topic={}, msg={}", topic, value);
     }
 
     protected void produceMsg2Kafka(String topic, byte[] value) {
         LOG.info("Kafka producer will produce msg. topic={}, msg={}", topic, value);
 
         ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, value);
-        producer.send(record);
+        producer.send(
+                record,
+                (recordMetadata, e) ->
+                        LOG.info(
+                                "Send Callback is {}, with error is ", recordMetadata.offset(), e));
+
         LOG.info("Kafka producer produced msg successfully. topic={}, msg={}", topic, value);
     }
 }

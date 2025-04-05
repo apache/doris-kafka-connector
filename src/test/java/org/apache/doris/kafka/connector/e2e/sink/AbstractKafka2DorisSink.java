@@ -170,6 +170,8 @@ public abstract class AbstractKafka2DorisSink {
     public static void close() {
         kafkaContainerService.close();
         dorisContainerService.close();
+        kafkaContainerService = null;
+        dorisContainerService = null;
     }
 
     public void checkResult(List<String> expected, String query, int columnSize) throws Exception {

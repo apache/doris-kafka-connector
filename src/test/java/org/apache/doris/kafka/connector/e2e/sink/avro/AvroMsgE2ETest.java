@@ -100,7 +100,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
         configNode.put("value.converter.schema.registry.url", getSchemaRegistryUrl());
         jsonMsgConnectorContent = new ObjectMapper().writeValueAsString(jsonNode);
 
-        String topic = "avro-user";
+        String topic = "avro-user-confluent";
         Schema.Parser parser = new Schema.Parser();
         Schema schema = parser.parse(loadContent("src/test/resources/decode/avro/user.avsc"));
 

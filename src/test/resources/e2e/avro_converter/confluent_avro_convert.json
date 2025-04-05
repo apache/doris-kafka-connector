@@ -2,9 +2,9 @@
   "name":"confluent-avro-test",
   "config":{
   "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
-  "topics":"avro-user",
+  "topics":"avro-user-confluent",
   "tasks.max":"1",
-  "doris.topic2table.map": "avro-user:confluent_avro_tab",
+  "doris.topic2table.map": "avro-user-confluent:confluent_avro_tab",
   "buffer.count.records":"1",
   "buffer.flush.time":"10",
   "buffer.size.bytes":"10000000",
