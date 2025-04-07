@@ -168,10 +168,9 @@ public abstract class AbstractKafka2DorisSink {
 
     @AfterClass
     public static void close() {
+        // Closed automatically, multiple itcases can be reused
         // kafkaContainerService.close();
         // dorisContainerService.close();
-        // kafkaContainerService = null;
-        // dorisContainerService = null;
     }
 
     public void checkResult(List<String> expected, String query, int columnSize) throws Exception {
