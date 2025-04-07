@@ -26,6 +26,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -41,7 +42,10 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.kafka.connect.cli.ConnectDistributed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 public class KafkaContainerServiceImpl implements KafkaContainerService {
@@ -60,9 +64,12 @@ public class KafkaContainerServiceImpl implements KafkaContainerService {
     private String kafkaServerHost;
     private int kafkaServerPort;
     private static final String CONNECT_PORT = "8083";
+    private static final String REGISTRY_PORT = "8081";
     private static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private static final int MAX_RETRIES = 5;
+    private GenericContainer schemaRegistryContainer;
+    private static Network network = Network.SHARED;
 
     @Override
     public String getInstanceHostAndPort() {
@@ -148,7 +155,7 @@ public class KafkaContainerServiceImpl implements KafkaContainerService {
     public void startContainer() {
         LOG.info("kafka server is about to be initialized.");
         kafkaContainer = new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE));
-
+        kafkaContainer.withNetwork(network).withNetworkAliases("kafka");
         kafkaContainer.start();
         try {
             Thread.sleep(5000);
@@ -167,11 +174,52 @@ public class KafkaContainerServiceImpl implements KafkaContainerService {
     }
 
     @Override
+    public void startSchemaRegistry() {
+        LOG.info("start schema registry.");
+        schemaRegistryContainer =
+                new GenericContainer<>("confluentinc/cp-schema-registry:7.6.1")
+                        .withNetwork(network)
+                        .withExposedPorts(8081)
+                        .withNetworkAliases("schema-registry")
+                        .withEnv("SCHEMA_REGISTRY_HOST_NAME", "schema-registry")
+                        .withEnv(
+                                "SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS",
+                                "PLAINTEXT://kafka:9092")
+                        .withEnv("SCHEMA_REGISTRY_LISTENERS", "http://0.0.0.0:8081")
+                        .waitingFor(
+                                Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(2)));
+
+        schemaRegistryContainer.start();
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new DorisException(e);
+        }
+        LOG.info(
+                "start schema registry successfuly, with "
+                        + schemaRegistryContainer.getHost()
+                        + ":"
+                        + schemaRegistryContainer.getMappedPort(8081));
+    }
+
+    @Override
+    public String getSchemaRegistryUrl() {
+        return "http://"
+                + schemaRegistryContainer.getHost()
+                + ":"
+                + schemaRegistryContainer.getMappedPort(8081);
+    }
+
+    @Override
     public void close() {
         LOG.info("Kafka server is about to be shut down.");
         shutdownConnector();
         kafkaContainer.close();
         LOG.info("Kafka server shuts down successfully.");
+        if (schemaRegistryContainer != null) {
+            schemaRegistryContainer.close();
+            LOG.info("Kafka schema registry shuts down successfully.");
+        }
     }
 
     private void shutdownConnector() {

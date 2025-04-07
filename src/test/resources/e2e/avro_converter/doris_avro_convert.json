@@ -1,0 +1,21 @@
+{
+  "name":"avro_sink-connector",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"avro-user",
+    "tasks.max":"1",
+    "doris.topic2table.map": "avro-user:doris_avro_tab",
+    "buffer.count.records":"1",
+    "buffer.flush.time":"10",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"avro_convert",
+    "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "value.converter":"org.apache.doris.kafka.connector.decode.avro.DorisAvroConverter",
+    "value.converter.avro.topic2schema.filepath":"avro-user:file:///opt/avro_user.avsc"
+  }
+}

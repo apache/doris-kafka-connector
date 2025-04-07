@@ -1,0 +1,25 @@
+{
+  "name":"debezium_dml_event",
+  "config": {
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"debezium_dml_event",
+    "tasks.max":"1",
+    "doris.topic2table.map": "debezium_dml_event:debezium_dml_event_tab",
+    "buffer.count.records":"1",
+    "buffer.flush.time":"10",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"debezium_ingestion_msg",
+    "converter.mode": "debezium_ingestion",
+    "load.model":"stream_load",
+    "delivery.guarantee":"exactly_once",
+    "enable.2pc": "true",
+    "enable.delete": "true",
+    "key.converter":"org.apache.kafka.connect.json.JsonConverter",
+    "value.converter":"org.apache.kafka.connect.json.JsonConverter"
+  }
+}
