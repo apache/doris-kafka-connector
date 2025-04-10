@@ -97,6 +97,10 @@ public class RespContent {
         return message;
     }
 
+    public String getLabel() {
+        return label;
+    }
+
     public String getExistingJobStatus() {
         return existingJobStatus;
     }

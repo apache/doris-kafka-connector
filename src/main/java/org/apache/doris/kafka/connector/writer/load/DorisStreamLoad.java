@@ -102,6 +102,9 @@ public class DorisStreamLoad extends DataLoad {
                 LOG.info("load Result {}", loadResult);
                 KafkaRespContent respContent =
                         OBJECT_MAPPER.readValue(loadResult, KafkaRespContent.class);
+                if (respContent == null || respContent.getMessage() == null) {
+                    throw new StreamLoadException("response error : " + loadResult);
+                }
                 if (!DORIS_SUCCESS_STATUS.contains(respContent.getStatus())) {
                     String errMsg =
                             String.format(

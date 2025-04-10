@@ -1,0 +1,25 @@
+{
+  "name":"string_msg_failover_connector",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"string_test_failover",
+    "tasks.max":"1",
+    "doris.topic2table.map": "string_test_failover:string_msg_tab_failover",
+    "buffer.count.records":"1",
+    "buffer.flush.time":"1200",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"string_msg_failover",
+    "load.model":"stream_load",
+    "delivery.guarantee":"exactly_once",
+    "enable.2pc": "true",
+    "max.retries": "10",
+    "retry.interval.ms": "5000",
+    "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "value.converter":"org.apache.kafka.connect.storage.StringConverter"
+  }
+}

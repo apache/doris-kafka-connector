@@ -22,6 +22,7 @@ package org.apache.doris.kafka.connector;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.service.DorisSinkService;
 import org.apache.doris.kafka.connector.service.DorisSinkServiceFactory;
 import org.apache.doris.kafka.connector.utils.Version;
@@ -37,6 +38,8 @@ import org.slf4j.LoggerFactory;
 public class DorisSinkTask extends SinkTask {
     private static final Logger LOG = LoggerFactory.getLogger(DorisSinkTask.class);
     private DorisSinkService sink = null;
+    private DorisOptions options;
+    private int remainingRetries;
 
     /** default constructor, invoked by kafka connect framework */
     public DorisSinkTask() {}
@@ -49,7 +52,9 @@ public class DorisSinkTask extends SinkTask {
      */
     @Override
     public void start(final Map<String, String> parsedConfig) {
-        LOG.info("kafka doris sink task start");
+        LOG.info("kafka doris sink task start with {}", parsedConfig);
+        this.options = new DorisOptions(parsedConfig);
+        this.remainingRetries = options.getMaxRetries();
         this.sink = DorisSinkServiceFactory.getDorisSinkService(parsedConfig);
     }
 
@@ -94,7 +99,20 @@ public class DorisSinkTask extends SinkTask {
     @Override
     public void put(final Collection<SinkRecord> records) {
         LOG.info("Read {} records from Kafka", records.size());
-        sink.insert(records);
+        try {
+            sink.insert(records);
+        } catch (Exception ex) {
+            LOG.error("Error inserting records to Doris", ex);
+            if (remainingRetries > 0) {
+                LOG.info(
+                        "Retrying to insert records to Doris, remaining retries: {}",
+                        remainingRetries);
+                remainingRetries--;
+                context.timeout(options.getRetryIntervalMs());
+                throw new RetriableException(ex);
+            }
+            throw ex;
+        }
     }
 
     /**

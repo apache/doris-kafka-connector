@@ -66,6 +66,8 @@ public class DorisOptions {
     private final DeliveryGuarantee deliveryGuarantee;
     private final ConverterMode converterMode;
     private final SchemaEvolutionMode schemaEvolutionMode;
+    private final int maxRetries;
+    private final int retryIntervalMs;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -127,6 +129,17 @@ public class DorisOptions {
         }
         this.streamLoadProp = getStreamLoadPropFromConfig(config);
         this.enableGroupCommit = ConfigCheckUtils.validateGroupCommitMode(this);
+        this.maxRetries =
+                Integer.parseInt(
+                        config.getOrDefault(
+                                DorisSinkConnectorConfig.MAX_RETRIES,
+                                String.valueOf(DorisSinkConnectorConfig.MAX_RETRIES_DEFAULT)));
+        this.retryIntervalMs =
+                Integer.parseInt(
+                        config.getOrDefault(
+                                DorisSinkConnectorConfig.RETRY_INTERVAL_MS,
+                                String.valueOf(
+                                        DorisSinkConnectorConfig.RETRY_INTERVAL_MS_DEFAULT)));
     }
 
     private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
@@ -319,5 +332,13 @@ public class DorisOptions {
 
     public boolean isEnableDelete() {
         return enableDelete;
+    }
+
+    public int getMaxRetries() {
+        return maxRetries;
+    }
+
+    public int getRetryIntervalMs() {
+        return retryIntervalMs;
     }
 }

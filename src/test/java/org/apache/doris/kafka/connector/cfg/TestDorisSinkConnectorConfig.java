@@ -260,6 +260,20 @@ public class TestDorisSinkConnectorConfig {
         ConfigCheckUtils.validateConfig(config);
     }
 
+    @Test(expected = DorisException.class)
+    public void testMaxRetryException() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.MAX_RETRIES, "abc");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test(expected = DorisException.class)
+    public void testRetryIntervalMsException() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, "abc");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
     @Test
     public void testSchemaEvolutionMode() {
         Map<String, String> config = getConfig();
