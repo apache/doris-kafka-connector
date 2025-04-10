@@ -20,15 +20,6 @@
 package org.apache.doris.kafka.connector.e2e.doris;
 
 import com.google.common.collect.Lists;
-import org.apache.doris.kafka.connector.exception.DorisException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.utility.DockerLoggerFactory;
-import org.testcontainers.utility.MountableFile;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -46,6 +37,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.LockSupport;
+import org.apache.doris.kafka.connector.exception.DorisException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.utility.DockerLoggerFactory;
+import org.testcontainers.utility.MountableFile;
 
 public class DorisContainerServiceImpl implements DorisContainerService {
     protected static final Logger LOG = LoggerFactory.getLogger(DorisContainerServiceImpl.class);

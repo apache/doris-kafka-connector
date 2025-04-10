@@ -20,15 +20,6 @@
 package org.apache.doris.kafka.connector.e2e.sink.stringconverter;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.doris.kafka.connector.cfg.DorisOptions;
-import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
-import org.apache.doris.kafka.connector.exception.DorisException;
-import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -40,6 +31,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.StringJoiner;
+import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.doris.kafka.connector.exception.DorisException;
+import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** DorisSinkFailoverSinkTest is a test class for Doris Sink Connector. */
 public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
