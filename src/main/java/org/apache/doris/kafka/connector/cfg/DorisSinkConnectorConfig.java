@@ -93,7 +93,7 @@ public class DorisSinkConnectorConfig {
     public static final int MAX_RETRIES_DEFAULT = 10;
 
     public static final String RETRY_INTERVAL_MS = "retry.interval.ms";
-    public static final int RETRY_INTERVAL_MS_DEFAULT = 3000;
+    public static final int RETRY_INTERVAL_MS_DEFAULT = 6000;
 
     // metrics
     public static final String JMX_OPT = "jmx";
