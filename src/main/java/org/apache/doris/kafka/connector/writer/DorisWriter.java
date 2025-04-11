@@ -120,7 +120,7 @@ public abstract class DorisWriter {
                 && record.kafkaOffset() > processedOffset.get()) {
             SinkRecord dorisRecord = record;
             RecordBuffer tmpBuff = null;
-            processedOffset.set(dorisRecord.kafkaOffset());
+
             putBuffer(dorisRecord);
             if (buffer.getBufferSizeBytes() >= dorisOptions.getFileSize()
                     || (dorisOptions.getRecordNum() != 0
@@ -132,6 +132,7 @@ public abstract class DorisWriter {
             if (tmpBuff != null) {
                 flush(tmpBuff);
             }
+            processedOffset.set(dorisRecord.kafkaOffset());
         } else {
             LOG.warn(
                     "The record offset is smaller than processedOffset. recordOffset={}, offsetPersistedInDoris={}, processedOffset={}",

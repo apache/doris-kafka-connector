@@ -184,6 +184,22 @@ public class ConfigCheckUtils {
             configIsValid = false;
         }
 
+        String maxRetries = config.get(DorisSinkConnectorConfig.MAX_RETRIES);
+        if (!isNumeric(maxRetries) || isIllegalRange(maxRetries, 0)) {
+            LOG.error(
+                    "{} cannot be empty or not a number or less than 0.",
+                    DorisSinkConnectorConfig.MAX_RETRIES);
+            configIsValid = false;
+        }
+
+        String retryIntervalMs = config.get(DorisSinkConnectorConfig.RETRY_INTERVAL_MS);
+        if (!isNumeric(retryIntervalMs) || isIllegalRange(retryIntervalMs, 0)) {
+            LOG.error(
+                    "{} cannot be empty or not a number or less than 0.",
+                    DorisSinkConnectorConfig.RETRY_INTERVAL_MS);
+            configIsValid = false;
+        }
+
         if (!configIsValid) {
             throw new DorisException(
                     "input kafka connector configuration is null, missing required values, or wrong input value");

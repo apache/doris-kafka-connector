@@ -24,6 +24,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
@@ -36,12 +37,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.e2e.doris.DorisContainerService;
 import org.apache.doris.kafka.connector.e2e.doris.DorisContainerServiceImpl;
 import org.apache.doris.kafka.connector.e2e.kafka.KafkaContainerService;
 import org.apache.doris.kafka.connector.e2e.kafka.KafkaContainerServiceImpl;
 import org.apache.doris.kafka.connector.exception.DorisException;
+import org.apache.http.HttpHeaders;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -194,5 +202,52 @@ public abstract class AbstractKafka2DorisSink {
         LOG.info("expected result: {}", Arrays.toString(expected.toArray()));
         LOG.info("actual result: {}", Arrays.toString(actual.toArray()));
         Assert.assertArrayEquals(expected.toArray(), actual.toArray());
+    }
+
+    protected void faultInjectionOpen() throws IOException {
+        String pointName = "FlushToken.submit_flush_error";
+        String apiUrl =
+                String.format(
+                        "http://%s:%s/api/debug_point/add/%s",
+                        dorisContainerService.getInstanceHost(), 8040, pointName);
+        HttpPost httpPost = new HttpPost(apiUrl);
+        httpPost.addHeader(HttpHeaders.AUTHORIZATION, auth(USERNAME, PASSWORD));
+        try (CloseableHttpClient httpClient = HttpClients.custom().build()) {
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String reason = response.getStatusLine().toString();
+                if (statusCode == 200 && response.getEntity() != null) {
+                    LOG.info("Debug point response {}", EntityUtils.toString(response.getEntity()));
+                } else {
+                    LOG.info("Debug point failed, statusCode: {}, reason: {}", statusCode, reason);
+                }
+            }
+        }
+    }
+
+    protected void faultInjectionClear() throws IOException {
+        String apiUrl =
+                String.format(
+                        "http://%s:%s/api/debug_point/clear",
+                        dorisContainerService.getInstanceHost(), 8040);
+        HttpPost httpPost = new HttpPost(apiUrl);
+        httpPost.addHeader(HttpHeaders.AUTHORIZATION, auth(USERNAME, PASSWORD));
+        try (CloseableHttpClient httpClient = HttpClients.custom().build()) {
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String reason = response.getStatusLine().toString();
+                if (statusCode == 200 && response.getEntity() != null) {
+                    LOG.info("Debug point response {}", EntityUtils.toString(response.getEntity()));
+                } else {
+                    LOG.info("Debug point failed, statusCode: {}, reason: {}", statusCode, reason);
+                }
+            }
+        }
+    }
+
+    protected String auth(String user, String password) {
+        final String authInfo = user + ":" + password;
+        byte[] encoded = Base64.encodeBase64(authInfo.getBytes(StandardCharsets.UTF_8));
+        return "Basic " + new String(encoded);
     }
 }

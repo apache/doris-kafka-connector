@@ -89,6 +89,12 @@ public class DorisSinkConnectorConfig {
     public static final String DEBEZIUM_SCHEMA_EVOLUTION_DEFAULT =
             SchemaEvolutionMode.NONE.getName();
 
+    public static final String MAX_RETRIES = "max.retries";
+    public static final int MAX_RETRIES_DEFAULT = 10;
+
+    public static final String RETRY_INTERVAL_MS = "retry.interval.ms";
+    public static final int RETRY_INTERVAL_MS_DEFAULT = 6000;
+
     // metrics
     public static final String JMX_OPT = "jmx";
     public static final boolean JMX_OPT_DEFAULT = true;
@@ -116,6 +122,9 @@ public class DorisSinkConnectorConfig {
         setFieldToDefaultValues(
                 config, DEBEZIUM_SCHEMA_EVOLUTION, DEBEZIUM_SCHEMA_EVOLUTION_DEFAULT);
         setFieldToDefaultValues(config, JMX_OPT, String.valueOf(JMX_OPT_DEFAULT));
+        setFieldToDefaultValues(config, MAX_RETRIES, String.valueOf(MAX_RETRIES_DEFAULT));
+        setFieldToDefaultValues(
+                config, RETRY_INTERVAL_MS, String.valueOf(RETRY_INTERVAL_MS_DEFAULT));
     }
 
     public static Map<String, String> convertToLowercase(Map<String, String> config) {
@@ -270,7 +279,19 @@ public class DorisSinkConnectorConfig {
                         Type.STRING,
                         LOAD_MODEL_DEFAULT,
                         Importance.HIGH,
-                        "load model is stream_load.");
+                        "load model is stream_load.")
+                .define(
+                        MAX_RETRIES,
+                        Type.INT,
+                        MAX_RETRIES_DEFAULT,
+                        Importance.MEDIUM,
+                        "The maximum number of times to retry on errors before failing the task.")
+                .define(
+                        RETRY_INTERVAL_MS,
+                        Type.INT,
+                        RETRY_INTERVAL_MS_DEFAULT,
+                        Importance.MEDIUM,
+                        "The time in milliseconds to wait following an error before a retry attempt is made.");
     }
 
     public static class TopicToTableValidator implements ConfigDef.Validator {
