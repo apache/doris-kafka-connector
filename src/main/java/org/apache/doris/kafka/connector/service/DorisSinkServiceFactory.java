@@ -20,11 +20,13 @@
 package org.apache.doris.kafka.connector.service;
 
 import java.util.Map;
+import org.apache.kafka.connect.sink.SinkTaskContext;
 
 /** A factory to create {@link DorisSinkService} */
 public class DorisSinkServiceFactory {
 
-    public static DorisSinkService getDorisSinkService(Map<String, String> connectorConfig) {
-        return new DorisDefaultSinkService(connectorConfig);
+    public static DorisSinkService getDorisSinkService(
+            Map<String, String> connectorConfig, SinkTaskContext context) {
+        return new DorisDefaultSinkService(connectorConfig, context);
     }
 }

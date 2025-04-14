@@ -306,6 +306,31 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         checkResult(expectedResult, query1, 3);
     }
 
+    @Test
+    public void testTopicMutatingSmt() throws Exception {
+        initialize("src/test/resources/e2e/transforms/regex_router_transforms.json");
+        String topic = "p-regex_router_transform_msg";
+        String msg1 = "{\"id\":1,\"col1\":\"col1\",\"col2\":\"col2\"}";
+        produceMsg2Kafka(topic, msg1);
+
+        String tableSql1 =
+                loadContent("src/test/resources/e2e/transforms/regex_router_transforms.sql");
+        createTable(tableSql1);
+
+        Thread.sleep(2000);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        List<String> expectedResult = Collections.emptyList();
+        Thread.sleep(10000);
+        String query1 =
+                String.format(
+                        "select id,col1,col2 from %s.%s order by id",
+                        database, "regex_router_transform_msg");
+
+        Assert.assertEquals("FAILED", kafkaContainerService.getConnectorTaskStatus(connectorName));
+        checkResult(expectedResult, query1, 3);
+    }
+
     @AfterClass
     public static void closeInstance() {
         kafkaContainerService.deleteKafkaConnector(connectorName);

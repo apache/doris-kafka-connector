@@ -37,5 +37,7 @@ public interface KafkaContainerService {
 
     void deleteKafkaConnector(String name);
 
+    String getConnectorTaskStatus(String name);
+
     void close();
 }
