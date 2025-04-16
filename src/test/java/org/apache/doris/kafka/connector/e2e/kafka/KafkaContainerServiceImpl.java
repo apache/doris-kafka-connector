@@ -19,6 +19,8 @@
 
 package org.apache.doris.kafka.connector.e2e.kafka;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -35,10 +37,12 @@ import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.apache.kafka.connect.cli.ConnectDistributed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +74,7 @@ public class KafkaContainerServiceImpl implements KafkaContainerService {
     private static final int MAX_RETRIES = 5;
     private GenericContainer schemaRegistryContainer;
     private static Network network = Network.SHARED;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public String getInstanceHostAndPort() {
@@ -283,5 +288,33 @@ public class KafkaContainerServiceImpl implements KafkaContainerService {
             LOG.warn("Failed to delete kafka connect, name={}", name);
         }
         LOG.info("{} Kafka connector deleted successfully.", name);
+    }
+
+    @Override
+    public String getConnectorTaskStatus(String name) {
+        String connectUrl = "http://" + kafkaServerHost + ":" + CONNECT_PORT + "/connectors/";
+        String getStatusUrl = connectUrl + name + "/status";
+        HttpGet httpGet = new HttpGet(getStatusUrl);
+        try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+            StatusLine statusLine = response.getStatusLine();
+            if (statusLine.getStatusCode() != 200) {
+                LOG.warn(
+                        "Failed to get connector status, name={}, msg={}",
+                        name,
+                        statusLine.getReasonPhrase());
+            }
+            JsonNode root = objectMapper.readTree(EntityUtils.toString(response.getEntity()));
+            JsonNode tasks = root.get("tasks");
+            // tasks is an array, and only care about the first task
+            if (tasks != null && tasks.isArray() && tasks.size() > 0) {
+                JsonNode task = tasks.get(0);
+                return task.get("state").asText(); // RUNNING / FAILED / UNASSIGNED
+            } else {
+                LOG.warn("No task info found for connector: " + name);
+            }
+        } catch (IOException e) {
+            LOG.warn("Failed to get kafka connect task status, name={}", name);
+        }
+        return null;
     }
 }
