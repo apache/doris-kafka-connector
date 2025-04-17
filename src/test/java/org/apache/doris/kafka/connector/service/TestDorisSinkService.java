@@ -36,6 +36,7 @@ import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTaskContext;
@@ -47,6 +48,7 @@ public class TestDorisSinkService {
 
     private DorisDefaultSinkService dorisDefaultSinkService;
     private JsonConverter jsonConverter = new JsonConverter();
+    private Properties props = new Properties();
 
     @Before
     public void init() throws IOException {
@@ -54,7 +56,6 @@ public class TestDorisSinkService {
                 this.getClass()
                         .getClassLoader()
                         .getResourceAsStream("doris-connector-sink.properties");
-        Properties props = new Properties();
         props.load(stream);
         DorisSinkConnectorConfig.setDefaultValues((Map) props);
         props.put("task_id", "1");
@@ -169,5 +170,69 @@ public class TestDorisSinkService {
                 "Unexpected topic name: [mutated_topic] that doesn't match assigned partitions. Connector doesn't support topic mutating SMTs.",
                 ConnectException.class,
                 () -> dorisDefaultSinkService.checkTopicMutating(record2));
+    }
+
+    @Test
+    public void shouldSkipRecordTest() {
+        // default
+        SinkRecord record1 =
+                new SinkRecord(
+                        "topic_test",
+                        0,
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "key",
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "{\"id\":1,\"name\":\"bob\",\"age\":12}",
+                        1);
+        Assert.assertFalse(dorisDefaultSinkService.shouldSkipRecord(record1));
+        SinkRecord record2 =
+                new SinkRecord(
+                        "topic_test",
+                        0,
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "key",
+                        SchemaBuilder.map(Schema.STRING_SCHEMA, Schema.STRING_SCHEMA)
+                                .optional()
+                                .build(),
+                        null,
+                        1);
+        Assert.assertTrue(dorisDefaultSinkService.shouldSkipRecord(record2));
+
+        // ignore value
+        props.put("behavior.on.null.values", "ignore");
+        dorisDefaultSinkService =
+                new DorisDefaultSinkService((Map) props, mock(SinkTaskContext.class));
+        SinkRecord record3 =
+                new SinkRecord(
+                        "topic_test",
+                        0,
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "key",
+                        SchemaBuilder.map(Schema.STRING_SCHEMA, Schema.STRING_SCHEMA)
+                                .optional()
+                                .build(),
+                        null,
+                        1);
+        Assert.assertTrue(dorisDefaultSinkService.shouldSkipRecord(record3));
+
+        // fail value
+        props.put("behavior.on.null.values", "fail");
+        dorisDefaultSinkService =
+                new DorisDefaultSinkService((Map) props, mock(SinkTaskContext.class));
+        SinkRecord record4 =
+                new SinkRecord(
+                        "topic_test",
+                        0,
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "key",
+                        SchemaBuilder.map(Schema.STRING_SCHEMA, Schema.STRING_SCHEMA)
+                                .optional()
+                                .build(),
+                        null,
+                        1);
+        Assert.assertThrows(
+                "Null valued record from topic topic_test, partition 0 and offset 1 was failed (the configuration property 'behavior.on.null.values' is 'FAIL').",
+                DataException.class,
+                () -> dorisDefaultSinkService.shouldSkipRecord(record4));
     }
 }
