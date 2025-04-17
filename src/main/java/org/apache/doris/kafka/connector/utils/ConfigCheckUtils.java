@@ -32,6 +32,7 @@ import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
 import org.apache.doris.kafka.connector.exception.ArgumentsException;
 import org.apache.doris.kafka.connector.exception.DorisException;
+import org.apache.doris.kafka.connector.model.BehaviorOnNullValues;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
 import org.apache.doris.kafka.connector.writer.LoadConstants;
 import org.apache.doris.kafka.connector.writer.load.GroupCommitMode;
@@ -197,6 +198,15 @@ public class ConfigCheckUtils {
             LOG.error(
                     "{} cannot be empty or not a number or less than 0.",
                     DorisSinkConnectorConfig.RETRY_INTERVAL_MS);
+            configIsValid = false;
+        }
+
+        String behaviorOnNullValues = config.get(DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES);
+        if (!validateEnumInstances(behaviorOnNullValues, BehaviorOnNullValues.instances())) {
+            LOG.error(
+                    "The value of {} is an illegal parameter of {}.",
+                    behaviorOnNullValues,
+                    DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES);
             configIsValid = false;
         }
 

@@ -32,10 +32,12 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.DorisSinkTask;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.metrics.MetricsJmxReporter;
+import org.apache.doris.kafka.connector.model.BehaviorOnNullValues;
 import org.apache.doris.kafka.connector.writer.CopyIntoWriter;
 import org.apache.doris.kafka.connector.writer.DorisWriter;
 import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
@@ -43,6 +45,7 @@ import org.apache.doris.kafka.connector.writer.load.LoadModel;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,13 +125,8 @@ public class DorisDefaultSinkService implements DorisSinkService {
     public void insert(final Collection<SinkRecord> records) {
         // note that records can be empty
         for (SinkRecord record : records) {
-            // skip null value records
-            if (record.value() == null) {
-                LOG.debug(
-                        "Null valued record from topic '{}', partition {} and offset {} was skipped",
-                        record.topic(),
-                        record.kafkaPartition(),
-                        record.kafkaOffset());
+            // skip records
+            if (shouldSkipRecord(record)) {
                 continue;
             }
             // Might happen a count of record based flushing，buffer
@@ -192,6 +190,33 @@ public class DorisDefaultSinkService implements DorisSinkService {
                                 }
                             }
                         });
+    }
+
+    @VisibleForTesting
+    public boolean shouldSkipRecord(SinkRecord record) {
+        if (record.value() == null) {
+            switch (dorisOptions.getBehaviorOnNullValues()) {
+                case FAIL:
+                    throw new DataException(
+                            String.format(
+                                    "Null valued record from topic %s, partition %s and offset %s was failed "
+                                            + "(the configuration property '%s' is '%s').",
+                                    record.topic(),
+                                    record.kafkaPartition(),
+                                    record.kafkaOffset(),
+                                    DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES,
+                                    BehaviorOnNullValues.FAIL));
+                case IGNORE:
+                default:
+                    LOG.debug(
+                            "Null valued record from topic '{}', partition {} and offset {} was skipped",
+                            record.topic(),
+                            record.kafkaPartition(),
+                            record.kafkaOffset());
+                    return true;
+            }
+        }
+        return false;
     }
 
     /**
