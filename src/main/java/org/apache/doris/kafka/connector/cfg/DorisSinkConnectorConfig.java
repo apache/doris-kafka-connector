@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.doris.kafka.connector.DorisSinkConnector;
 import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
+import org.apache.doris.kafka.connector.model.BehaviorOnNullValues;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
@@ -95,6 +96,9 @@ public class DorisSinkConnectorConfig {
     public static final String RETRY_INTERVAL_MS = "retry.interval.ms";
     public static final int RETRY_INTERVAL_MS_DEFAULT = 6000;
 
+    public static final String BEHAVIOR_ON_NULL_VALUES = "behavior.on.null.values";
+    public static final String BEHAVIOR_ON_NULL_VALUES_DEFAULT = BehaviorOnNullValues.IGNORE.name();
+
     // metrics
     public static final String JMX_OPT = "jmx";
     public static final boolean JMX_OPT_DEFAULT = true;
@@ -125,6 +129,7 @@ public class DorisSinkConnectorConfig {
         setFieldToDefaultValues(config, MAX_RETRIES, String.valueOf(MAX_RETRIES_DEFAULT));
         setFieldToDefaultValues(
                 config, RETRY_INTERVAL_MS, String.valueOf(RETRY_INTERVAL_MS_DEFAULT));
+        setFieldToDefaultValues(config, BEHAVIOR_ON_NULL_VALUES, BEHAVIOR_ON_NULL_VALUES_DEFAULT);
     }
 
     public static Map<String, String> convertToLowercase(Map<String, String> config) {
@@ -291,7 +296,13 @@ public class DorisSinkConnectorConfig {
                         Type.INT,
                         RETRY_INTERVAL_MS_DEFAULT,
                         Importance.MEDIUM,
-                        "The time in milliseconds to wait following an error before a retry attempt is made.");
+                        "The time in milliseconds to wait following an error before a retry attempt is made.")
+                .define(
+                        BEHAVIOR_ON_NULL_VALUES,
+                        Type.STRING,
+                        BEHAVIOR_ON_NULL_VALUES_DEFAULT,
+                        Importance.LOW,
+                        "Used to handle records with a null value .");
     }
 
     public static class TopicToTableValidator implements ConfigDef.Validator {
