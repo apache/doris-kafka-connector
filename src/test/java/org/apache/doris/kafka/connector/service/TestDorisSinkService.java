@@ -60,7 +60,6 @@ public class TestDorisSinkService {
         props.put("task_id", "1");
         props.put("name", "sink-connector-test");
         props.put("record.tablename.field", "table_name");
-        props.put("enable.2pc", "false");
         SinkTaskContext context = mock(SinkTaskContext.class);
         TopicPartition assignedTp = new TopicPartition("expected-topic", 0);
         when(context.assignment()).thenReturn(Sets.newHashSet(assignedTp));
