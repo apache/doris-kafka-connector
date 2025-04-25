@@ -43,7 +43,9 @@ import org.apache.doris.kafka.connector.writer.load.LoadModel;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,9 +67,11 @@ public class DorisDefaultSinkService implements DorisSinkService {
     private final MetricsJmxReporter metricsJmxReporter;
     private final DorisConnectMonitor connectMonitor;
     private final ObjectMapper objectMapper;
+    private final SinkTaskContext context;
 
-    DorisDefaultSinkService(Map<String, String> config) {
+    DorisDefaultSinkService(Map<String, String> config, SinkTaskContext context) {
         this.dorisOptions = new DorisOptions(config);
+        this.context = context;
         this.objectMapper = new ObjectMapper();
         this.writer = new HashMap<>();
         this.conn = new JdbcConnectionProvider(dorisOptions);
@@ -131,6 +135,8 @@ public class DorisDefaultSinkService implements DorisSinkService {
                         record.kafkaOffset());
                 continue;
             }
+            // check topic mutating SMTs
+            checkTopicMutating(record);
             // Might happen a count of record based flushing，buffer
             insert(record);
         }
@@ -192,6 +198,18 @@ public class DorisDefaultSinkService implements DorisSinkService {
                                 }
                             }
                         });
+    }
+
+    /** Check if the topic of record is mutated */
+    public void checkTopicMutating(SinkRecord record) {
+        TopicPartition tp = new TopicPartition(record.topic(), record.kafkaPartition());
+        if (!context.assignment().contains(tp)) {
+            throw new ConnectException(
+                    "Unexpected topic name: ["
+                            + record.topic()
+                            + "] that doesn't match assigned partitions. "
+                            + "Connector doesn't support topic mutating SMTs. ");
+        }
     }
 
     /**

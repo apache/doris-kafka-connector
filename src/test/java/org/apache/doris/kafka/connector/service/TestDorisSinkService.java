@@ -19,6 +19,10 @@
 
 package org.apache.doris.kafka.connector.service;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -26,12 +30,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -53,7 +60,10 @@ public class TestDorisSinkService {
         props.put("task_id", "1");
         props.put("name", "sink-connector-test");
         props.put("record.tablename.field", "table_name");
-        dorisDefaultSinkService = new DorisDefaultSinkService((Map) props);
+        SinkTaskContext context = mock(SinkTaskContext.class);
+        TopicPartition assignedTp = new TopicPartition("expected-topic", 0);
+        when(context.assignment()).thenReturn(Sets.newHashSet(assignedTp));
+        dorisDefaultSinkService = new DorisDefaultSinkService((Map) props, context);
         jsonConverter.configure(new HashMap<>(), false);
     }
 
@@ -131,5 +141,33 @@ public class TestDorisSinkService {
                         3);
         Assert.assertEquals(
                 "test_kafka_tbl", dorisDefaultSinkService.getSinkDorisTableName(record5));
+    }
+
+    @Test
+    public void testCheckTopicMutating() {
+        SinkRecord record1 =
+                new SinkRecord(
+                        "expected-topic",
+                        0,
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "key",
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "val",
+                        1);
+        SinkRecord record2 =
+                new SinkRecord(
+                        "mutated-topic",
+                        0,
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "key",
+                        Schema.OPTIONAL_STRING_SCHEMA,
+                        "val",
+                        1);
+        dorisDefaultSinkService.checkTopicMutating(record1);
+
+        Assert.assertThrows(
+                "Unexpected topic name: [mutated_topic] that doesn't match assigned partitions. Connector doesn't support topic mutating SMTs.",
+                ConnectException.class,
+                () -> dorisDefaultSinkService.checkTopicMutating(record2));
     }
 }

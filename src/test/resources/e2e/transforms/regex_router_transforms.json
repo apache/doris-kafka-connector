@@ -1,0 +1,26 @@
+{
+  "name":"regex_router_transforms_connector",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"p-regex_router_transform_msg",
+    "tasks.max":"1",
+    "doris.topic2table.map": "p-regex_router_transform_msg:regex_router_transform_msg,regex_router_transform_msg:regex_router_transform_msg",
+    "buffer.count.records":"2",
+    "buffer.flush.time":"11",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"transforms_msg",
+    "load.model":"stream_load",
+    "transforms": "dropPrefix",
+    "transforms.dropPrefix.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.dropPrefix.regex": "p-(.*)",
+    "transforms.dropPrefix.replacement": "$1",
+    "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "value.converter":"org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false"
+  }
+}
