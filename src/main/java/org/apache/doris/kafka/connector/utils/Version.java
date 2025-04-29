@@ -24,7 +24,7 @@ public class Version {
         try {
             return Version.class.getPackage().getImplementationVersion();
         } catch (Exception ex) {
-            return "24.0.0";
+            return "25.0.0";
         }
     }
 }
