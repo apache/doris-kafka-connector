@@ -274,6 +274,13 @@ public class TestDorisSinkConnectorConfig {
         ConfigCheckUtils.validateConfig(config);
     }
 
+    @Test(expected = DorisException.class)
+    public void testBehaviorOnNullValuesException() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES, "create");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
     @Test
     public void testSchemaEvolutionMode() {
         Map<String, String> config = getConfig();

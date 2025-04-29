@@ -331,6 +331,61 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         checkResult(expectedResult, query1, 3);
     }
 
+    @Test
+    public void testBehaviorOnNullValues() throws Exception {
+        // default
+        initialize("src/test/resources/e2e/string_converter/null_values_default.json");
+        String tableSql =
+                loadContent("src/test/resources/e2e/string_converter/null_values_tab.sql");
+        createTable(tableSql);
+        Thread.sleep(2000);
+
+        String topic = "behavior_on_null_values_test";
+        String msg1 = "{\"id\":1,\"col1\":\"col1\",\"col2\":\"col2\"}";
+        produceMsg2Kafka(topic, null);
+        produceMsg2Kafka(topic, msg1);
+
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        List<String> expected = Collections.singletonList("1,col1,col2");
+        Thread.sleep(10000);
+        String query1 =
+                String.format(
+                        "select id,col1,col2 from %s.%s order by id", database, "null_values_tab");
+        checkResult(expected, query1, 3);
+
+        kafkaContainerService.deleteKafkaConnector(connectorName);
+
+        // ignore
+        initialize("src/test/resources/e2e/string_converter/null_values_ignore.json");
+        produceMsg2Kafka(topic, null);
+        String msg2 = "{\"id\":2,\"col1\":\"col1\",\"col2\":\"col2\"}";
+        produceMsg2Kafka(topic, msg2);
+
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        Thread.sleep(10000);
+        expected = Arrays.asList("1,col1,col2", "2,col1,col2");
+        checkResult(expected, query1, 3);
+
+        kafkaContainerService.deleteKafkaConnector(connectorName);
+
+        // fail
+        initialize("src/test/resources/e2e/string_converter/null_values_fail.json");
+        produceMsg2Kafka(topic, null);
+
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        Thread.sleep(10000);
+        Assert.assertEquals("FAILED", kafkaContainerService.getConnectorTaskStatus(connectorName));
+
+        String msg3 = "{\"id\":3,\"col1\":\"col1\",\"col2\":\"col2\"}";
+        produceMsg2Kafka(topic, msg3);
+        Thread.sleep(10000);
+        // msg3 is not consumed
+        checkResult(expected, query1, 3);
+    }
+
     @AfterClass
     public static void closeInstance() {
         kafkaContainerService.deleteKafkaConnector(connectorName);

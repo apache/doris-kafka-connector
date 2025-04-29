@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
+import org.apache.doris.kafka.connector.model.BehaviorOnNullValues;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.apache.doris.kafka.connector.writer.DeliveryGuarantee;
 import org.apache.doris.kafka.connector.writer.load.LoadModel;
@@ -68,6 +69,7 @@ public class DorisOptions {
     private final SchemaEvolutionMode schemaEvolutionMode;
     private final int maxRetries;
     private final int retryIntervalMs;
+    private final BehaviorOnNullValues behaviorOnNullValues;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -140,6 +142,9 @@ public class DorisOptions {
                                 DorisSinkConnectorConfig.RETRY_INTERVAL_MS,
                                 String.valueOf(
                                         DorisSinkConnectorConfig.RETRY_INTERVAL_MS_DEFAULT)));
+        this.behaviorOnNullValues =
+                BehaviorOnNullValues.of(
+                        config.get(DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES));
     }
 
     private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
@@ -340,5 +345,9 @@ public class DorisOptions {
 
     public int getRetryIntervalMs() {
         return retryIntervalMs;
+    }
+
+    public BehaviorOnNullValues getBehaviorOnNullValues() {
+        return behaviorOnNullValues;
     }
 }
