@@ -307,6 +307,31 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
     }
 
     @Test
+    public void testMultipleTransformsChain() throws Exception {
+        initialize("src/test/resources/e2e/transforms/multiple_transforms_chain.json");
+        String topic = "multiple_transforms_chain_test";
+        String msg1 = "{\"type\": \"INSERT\",\"content\":{\"id\":1,\"old_col1\":\"col1\"}}";
+        String msg2 = "{\"type\": \"INSERT\",\"content\":{\"id\":2,\"old_col1\":\"col1\"}}";
+        produceMsg2Kafka(topic, msg1);
+        produceMsg2Kafka(topic, msg2);
+
+        String tableSql1 =
+                loadContent("src/test/resources/e2e/transforms/multiple_transforms_chain.sql");
+        createTable(tableSql1);
+
+        Thread.sleep(2000);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        List<String> expectedResult = Arrays.asList("1,col1", "2,col1");
+        Thread.sleep(10000);
+        String query1 =
+                String.format(
+                        "select id,col1 from %s.%s order by id",
+                        database, "multiple_transforms_chain_tab");
+        checkResult(expectedResult, query1, 2);
+    }
+
+    @Test
     public void testTopicMutatingSmt() throws Exception {
         initialize("src/test/resources/e2e/transforms/regex_router_transforms.json");
         String topic = "p-regex_router_transform_msg";
