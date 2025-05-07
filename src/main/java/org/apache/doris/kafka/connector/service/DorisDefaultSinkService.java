@@ -142,6 +142,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
         for (DorisWriter writer : writer.values()) {
             // Time based flushing
             if (writer.shouldFlush()) {
+                LOG.info("trigger flush by time.");
                 writer.flushBuffer();
             }
         }

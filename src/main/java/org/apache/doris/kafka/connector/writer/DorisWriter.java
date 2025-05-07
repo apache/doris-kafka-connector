@@ -130,6 +130,10 @@ public abstract class DorisWriter {
             }
 
             if (tmpBuff != null) {
+                LOG.info(
+                        "trigger flush by buffer size or count, buffer size: {}, num of records: {}",
+                        tmpBuff.getBufferSizeBytes(),
+                        tmpBuff.getNumOfRecords());
                 flush(tmpBuff);
             }
             processedOffset.set(dorisRecord.kafkaOffset());

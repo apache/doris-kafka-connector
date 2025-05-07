@@ -144,7 +144,7 @@ public class ConfigCheckUtils {
                 || isIllegalRange(
                         bufferFlushTime, DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC_MIN)) {
             LOG.error(
-                    "{} cannot be empty or not a number or less than 10.",
+                    "{} cannot be empty or not a number or less than 1.",
                     DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC);
             configIsValid = false;
         }

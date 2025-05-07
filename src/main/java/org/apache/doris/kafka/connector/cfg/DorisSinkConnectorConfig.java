@@ -48,16 +48,16 @@ public class DorisSinkConnectorConfig {
     // Connector config
     private static final String CONNECTOR_CONFIG = "Connector Config";
     public static final String BUFFER_COUNT_RECORDS = "buffer.count.records";
-    public static final long BUFFER_COUNT_RECORDS_DEFAULT = 10000;
+    public static final long BUFFER_COUNT_RECORDS_DEFAULT = 50000;
     public static final String BUFFER_SIZE_BYTES = "buffer.size.bytes";
-    public static final long BUFFER_SIZE_BYTES_DEFAULT = 5000000;
+    public static final long BUFFER_SIZE_BYTES_DEFAULT = 100 * 1024 * 1024;
     public static final long BUFFER_SIZE_BYTES_MIN = 1;
     public static final String TOPICS_TABLES_MAP = "doris.topic2table.map";
     public static final String RECORD_TABLE_NAME_FIELD = "record.tablename.field";
     public static final String LABEL_PREFIX = "label.prefix";
 
     // Time in seconds
-    public static final long BUFFER_FLUSH_TIME_SEC_MIN = 10;
+    public static final long BUFFER_FLUSH_TIME_SEC_MIN = 1;
     public static final long BUFFER_FLUSH_TIME_SEC_DEFAULT = 120;
     public static final String BUFFER_FLUSH_TIME_SEC = "buffer.flush.time";
 
