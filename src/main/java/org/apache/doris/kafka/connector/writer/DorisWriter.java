@@ -116,8 +116,11 @@ public abstract class DorisWriter {
 
     protected void insertRecord(final SinkRecord record) {
         // discard the record if the record offset is smaller or equal to server side offset
-        if (record.kafkaOffset() > this.offsetPersistedInDoris.get()
-                && record.kafkaOffset() > processedOffset.get()) {
+        // when enable.combine.flush=true, No verification is required because the offsets of
+        // multiple partitions cannot be compared.
+        if (dorisOptions.isEnableCombineFlush()
+                || (record.kafkaOffset() > this.offsetPersistedInDoris.get()
+                        && record.kafkaOffset() > processedOffset.get())) {
             SinkRecord dorisRecord = record;
             RecordBuffer tmpBuff = null;
 

@@ -81,6 +81,8 @@ public class DorisSinkConnectorConfig {
     public static final String AUTO_REDIRECT = "auto.redirect";
     public static final String DELIVERY_GUARANTEE = "delivery.guarantee";
     public static final String DELIVERY_GUARANTEE_DEFAULT = DeliveryGuarantee.AT_LEAST_ONCE.name();
+    public static final String ENABLE_COMBINE_FLUSH = "enable.combine.flush";
+    public static final String ENABLE_COMBINE_FLUSH_DEFAULT = "false";
     public static final String CONVERTER_MODE = "converter.mode";
     public static final String CONVERT_MODE_DEFAULT = ConverterMode.NORMAL.getName();
 
@@ -130,6 +132,7 @@ public class DorisSinkConnectorConfig {
         setFieldToDefaultValues(
                 config, RETRY_INTERVAL_MS, String.valueOf(RETRY_INTERVAL_MS_DEFAULT));
         setFieldToDefaultValues(config, BEHAVIOR_ON_NULL_VALUES, BEHAVIOR_ON_NULL_VALUES_DEFAULT);
+        setFieldToDefaultValues(config, ENABLE_COMBINE_FLUSH, ENABLE_COMBINE_FLUSH_DEFAULT);
     }
 
     public static Map<String, String> convertToLowercase(Map<String, String> config) {

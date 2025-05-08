@@ -26,11 +26,8 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.doris.kafka.connector.DorisSinkTask;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
@@ -38,10 +35,8 @@ import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.metrics.MetricsJmxReporter;
 import org.apache.doris.kafka.connector.model.BehaviorOnNullValues;
-import org.apache.doris.kafka.connector.writer.CopyIntoWriter;
 import org.apache.doris.kafka.connector.writer.DorisWriter;
 import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
-import org.apache.doris.kafka.connector.writer.load.LoadModel;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.data.Struct;
@@ -52,16 +47,8 @@ import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * This is per task configuration. A task can be assigned multiple partitions. Major methods are
- * startTask, insert, getOffset and close methods.
- *
- * <p>StartTask: Called when partitions are assigned. Responsible for generating the POJOs.
- *
- * <p>Insert and getOffset are called when {@link DorisSinkTask#put(Collection)} and {@link
- * DorisSinkTask#preCommit(Map)} APIs are called.
- */
-public class DorisDefaultSinkService implements DorisSinkService {
+/** Combined all partitions and write once. */
+public class DorisCombinedSinkService implements DorisSinkService {
     private static final Logger LOG = LoggerFactory.getLogger(DorisDefaultSinkService.class);
 
     private final ConnectionProvider conn;
@@ -71,8 +58,9 @@ public class DorisDefaultSinkService implements DorisSinkService {
     private final DorisConnectMonitor connectMonitor;
     private final ObjectMapper objectMapper;
     private final SinkTaskContext context;
+    private final Map<String, HashMap<Integer, Long>> topicPartitionOffset;
 
-    DorisDefaultSinkService(Map<String, String> config, SinkTaskContext context) {
+    DorisCombinedSinkService(Map<String, String> config, SinkTaskContext context) {
         this.dorisOptions = new DorisOptions(config);
         this.context = context;
         this.objectMapper = new ObjectMapper();
@@ -85,6 +73,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
                         dorisOptions.isEnableCustomJMX(),
                         dorisOptions.getTaskId(),
                         this.metricsJmxReporter);
+        this.topicPartitionOffset = new HashMap<>();
     }
 
     @Override
@@ -101,25 +90,16 @@ public class DorisDefaultSinkService implements DorisSinkService {
     @Override
     public void startTask(final String tableName, final TopicPartition topicPartition) {
         // check if the task is already started
-        String writerKey =
-                getWriterKey(topicPartition.topic(), topicPartition.partition(), tableName);
+        String writerKey = getWriterKey(topicPartition.topic(), tableName);
         if (writer.containsKey(writerKey)) {
-            LOG.info("already start task");
+            LOG.info("already start task with key {}", writerKey);
         } else {
             String topic = topicPartition.topic();
-            int partition = topicPartition.partition();
-            LoadModel loadModel = dorisOptions.getLoadModel();
+            // Only by topic
+            int partition = -1;
             DorisWriter dorisWriter =
-                    LoadModel.COPY_INTO.equals(loadModel)
-                            ? new CopyIntoWriter(
-                                    tableName, topic, partition, dorisOptions, conn, connectMonitor)
-                            : new StreamLoadWriter(
-                                    tableName,
-                                    topic,
-                                    partition,
-                                    dorisOptions,
-                                    conn,
-                                    connectMonitor);
+                    new StreamLoadWriter(
+                            tableName, topic, partition, dorisOptions, conn, connectMonitor);
             writer.put(writerKey, dorisWriter);
             metricsJmxReporter.start();
         }
@@ -135,9 +115,17 @@ public class DorisDefaultSinkService implements DorisSinkService {
             }
             // check topic mutating SMTs
             checkTopicMutating(record);
+
+            String topic = record.topic();
+            int partition = record.kafkaPartition();
+            if (!topicPartitionOffset.containsKey(topic)) {
+                topicPartitionOffset.put(topic, new HashMap<>());
+            }
+            topicPartitionOffset.get(topic).put(partition, record.kafkaOffset());
             // Might happen a count of record based flushing，buffer
             insert(record);
         }
+
         // check all sink writer to see if they need to be flushed
         for (DorisWriter writer : writer.values()) {
             // Time based flushing
@@ -150,32 +138,23 @@ public class DorisDefaultSinkService implements DorisSinkService {
     @Override
     public void insert(SinkRecord record) {
         String tableName = getSinkDorisTableName(record);
-        String writerKey = getWriterKey(record.topic(), record.kafkaPartition(), tableName);
+        String writerKey = getWriterKey(record.topic(), tableName);
         // init a new topic partition
         if (!writer.containsKey(writerKey)) {
-            startTask(tableName, new TopicPartition(record.topic(), record.kafkaPartition()));
+            startTask(tableName, new TopicPartition(record.topic(), -1));
         }
         writer.get(writerKey).insert(record);
     }
 
     @Override
     public long getOffset(final TopicPartition topicPartition) {
-        String tpName = getNameIndex(topicPartition.topic(), topicPartition.partition());
-        // get all writers for the topic partition
-        List<DorisWriter> writers =
-                writer.entrySet().stream()
-                        .filter(entry -> entry.getKey().startsWith(tpName))
-                        .map(Map.Entry::getValue)
-                        .collect(Collectors.toList());
-        if (writers.isEmpty()) {
-            LOG.info(
-                    "Topic: {} Partition: {} hasn't been initialized to get offset",
-                    topicPartition.topic(),
-                    topicPartition.partition());
-            return 0;
+        String topic = topicPartition.topic();
+        int partition = topicPartition.partition();
+        if (topicPartitionOffset.containsKey(topic)
+                && topicPartitionOffset.get(topic).containsKey(partition)) {
+            return topicPartitionOffset.get(topic).get(partition);
         }
-        // return the max offset of all writers
-        return writers.stream().map(DorisWriter::getOffset).reduce(Long::max).orElse(0L);
+        return 0;
     }
 
     @Override
@@ -185,17 +164,11 @@ public class DorisDefaultSinkService implements DorisSinkService {
 
     @Override
     public void commit(Map<TopicPartition, OffsetAndMetadata> offsets) {
-        offsets.keySet()
-                .forEach(
-                        tp -> {
-                            String tpName = getNameIndex(tp.topic(), tp.partition());
-                            // commit all writers that match the topic and partition
-                            for (Map.Entry<String, DorisWriter> entry : writer.entrySet()) {
-                                if (entry.getKey().startsWith(tpName)) {
-                                    entry.getValue().commit(tp.partition());
-                                }
-                            }
-                        });
+        // Here we force flushing the data in memory once to
+        // ensure that the offsets recorded in topicPartitionOffset have been flushed to doris
+        for (DorisWriter writer : writer.values()) {
+            writer.flushBuffer();
+        }
     }
 
     /** Check if the topic of record is mutated */
@@ -291,14 +264,13 @@ public class DorisDefaultSinkService implements DorisSinkService {
      * Parse the writer unique key
      *
      * @param topic topic name
-     * @param partition partition number
      * @param tableName table name
      * @return writer key
      */
-    private String getWriterKey(String topic, int partition, String tableName) {
+    private String getWriterKey(String topic, String tableName) {
         if (dorisOptions.getTopicMapTable(topic).equals(tableName)) {
-            return topic + "_" + partition;
+            return topic;
         }
-        return topic + "_" + partition + "_" + tableName;
+        return topic + "_" + tableName;
     }
 }

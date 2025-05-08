@@ -162,8 +162,29 @@ public class ConfigCheckUtils {
         if (!validateEnumInstances(deliveryGuarantee, DeliveryGuarantee.instances())) {
             LOG.error(
                     "The value of {} is an illegal parameter of {}.",
-                    loadModel,
+                    deliveryGuarantee,
                     DorisSinkConnectorConfig.DELIVERY_GUARANTEE);
+            configIsValid = false;
+        }
+
+        String enableCombineFlush = config.get(DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH);
+        if (!validateEnumInstances(enableCombineFlush, new String[] {"true", "false"})) {
+            LOG.error(
+                    "The value of {} is an illegal parameter of {}.",
+                    enableCombineFlush,
+                    DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH);
+            configIsValid = false;
+        }
+
+        if (configIsValid
+                && Boolean.parseBoolean(enableCombineFlush)
+                && DeliveryGuarantee.EXACTLY_ONCE.name().equalsIgnoreCase(deliveryGuarantee)) {
+            LOG.error(
+                    "The value of {} is not supported set {} when {} is set to {}.",
+                    DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH,
+                    enableCombineFlush,
+                    DorisSinkConnectorConfig.DELIVERY_GUARANTEE,
+                    DeliveryGuarantee.EXACTLY_ONCE.name());
             configIsValid = false;
         }
 
