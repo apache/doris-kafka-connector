@@ -19,66 +19,27 @@
 
 package org.apache.doris.kafka.connector.service;
 
-import com.codahale.metrics.MetricRegistry;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.doris.kafka.connector.cfg.DorisOptions;
-import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
-import org.apache.doris.kafka.connector.connection.ConnectionProvider;
-import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
-import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
-import org.apache.doris.kafka.connector.metrics.MetricsJmxReporter;
-import org.apache.doris.kafka.connector.model.BehaviorOnNullValues;
 import org.apache.doris.kafka.connector.writer.DorisWriter;
 import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Combined all partitions and write once. */
-public class DorisCombinedSinkService implements DorisSinkService {
-    private static final Logger LOG = LoggerFactory.getLogger(DorisDefaultSinkService.class);
+public class DorisCombinedSinkService extends DorisDefaultSinkService {
+    private static final Logger LOG = LoggerFactory.getLogger(DorisCombinedSinkService.class);
 
-    private final ConnectionProvider conn;
-    private final Map<String, DorisWriter> writer;
-    private final DorisOptions dorisOptions;
-    private final MetricsJmxReporter metricsJmxReporter;
-    private final DorisConnectMonitor connectMonitor;
-    private final ObjectMapper objectMapper;
-    private final SinkTaskContext context;
     private final Map<String, HashMap<Integer, Long>> topicPartitionOffset;
 
     DorisCombinedSinkService(Map<String, String> config, SinkTaskContext context) {
-        this.dorisOptions = new DorisOptions(config);
-        this.context = context;
-        this.objectMapper = new ObjectMapper();
-        this.writer = new HashMap<>();
-        this.conn = new JdbcConnectionProvider(dorisOptions);
-        MetricRegistry metricRegistry = new MetricRegistry();
-        this.metricsJmxReporter = new MetricsJmxReporter(metricRegistry, dorisOptions.getName());
-        this.connectMonitor =
-                new DorisConnectMonitor(
-                        dorisOptions.isEnableCustomJMX(),
-                        dorisOptions.getTaskId(),
-                        this.metricsJmxReporter);
+        super(config, context);
         this.topicPartitionOffset = new HashMap<>();
-    }
-
-    @Override
-    public void startTask(TopicPartition topicPartition) {
-        startTask(dorisOptions.getTopicMapTable(topicPartition.topic()), topicPartition);
     }
 
     /**
@@ -158,106 +119,12 @@ public class DorisCombinedSinkService implements DorisSinkService {
     }
 
     @Override
-    public int getPartitionCount() {
-        return writer.size();
-    }
-
-    @Override
     public void commit(Map<TopicPartition, OffsetAndMetadata> offsets) {
         // Here we force flushing the data in memory once to
         // ensure that the offsets recorded in topicPartitionOffset have been flushed to doris
         for (DorisWriter writer : writer.values()) {
             writer.flushBuffer();
         }
-    }
-
-    /** Check if the topic of record is mutated */
-    public void checkTopicMutating(SinkRecord record) {
-        TopicPartition tp = new TopicPartition(record.topic(), record.kafkaPartition());
-        if (!context.assignment().contains(tp)) {
-            throw new ConnectException(
-                    "Unexpected topic name: ["
-                            + record.topic()
-                            + "] that doesn't match assigned partitions. "
-                            + "Connector doesn't support topic mutating SMTs. ");
-        }
-    }
-
-    @VisibleForTesting
-    public boolean shouldSkipRecord(SinkRecord record) {
-        if (record.value() == null) {
-            switch (dorisOptions.getBehaviorOnNullValues()) {
-                case FAIL:
-                    throw new DataException(
-                            String.format(
-                                    "Null valued record from topic %s, partition %s and offset %s was failed "
-                                            + "(the configuration property '%s' is '%s').",
-                                    record.topic(),
-                                    record.kafkaPartition(),
-                                    record.kafkaOffset(),
-                                    DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES,
-                                    BehaviorOnNullValues.FAIL));
-                case IGNORE:
-                default:
-                    LOG.debug(
-                            "Null valued record from topic '{}', partition {} and offset {} was skipped",
-                            record.topic(),
-                            record.kafkaPartition(),
-                            record.kafkaOffset());
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Get the table name in doris for the given record.
-     *
-     * @param record sink record
-     * @return table name in doris
-     */
-    @VisibleForTesting
-    public String getSinkDorisTableName(SinkRecord record) {
-        String defaultTableName = dorisOptions.getTopicMapTable(record.topic());
-        String field = dorisOptions.getTableNameField();
-        // if the field is not set, use the table name in the config
-        if (StringUtils.isEmpty(field)) {
-            return defaultTableName;
-        }
-        return parseRecordTableName(defaultTableName, field, record);
-    }
-
-    private String parseRecordTableName(
-            String defaultTableName, String tableNameField, SinkRecord record) {
-        Object recordValue = record.value();
-        Map<String, Object> recordMap = Collections.emptyMap();
-        if (recordValue instanceof Struct) {
-            LOG.warn(
-                    "The Struct type record not supported for The 'record.tablename.field' configuration, field={}",
-                    tableNameField);
-            return defaultTableName;
-        } else if (recordValue instanceof Map) {
-            recordMap = (Map<String, Object>) recordValue;
-        } else if (recordValue instanceof String) {
-            try {
-                recordMap = objectMapper.readValue((String) recordValue, Map.class);
-            } catch (JsonProcessingException e) {
-                LOG.warn(
-                        "The String type record failed to parse record value to map. record={}, field={}",
-                        recordValue,
-                        tableNameField,
-                        e);
-            }
-        }
-        // if the field is not found in the record, use the table name in the config
-        if (!recordMap.containsKey(tableNameField)) {
-            return defaultTableName;
-        }
-        return recordMap.get(tableNameField).toString();
-    }
-
-    private static String getNameIndex(String topic, int partition) {
-        return topic + "_" + partition;
     }
 
     /**
