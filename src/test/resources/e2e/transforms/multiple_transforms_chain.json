@@ -1,0 +1,27 @@
+{
+  "name":"multiple_transforms_chain_connector",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"multiple_transforms_chain_test",
+    "tasks.max":"1",
+    "doris.topic2table.map": "multiple_transforms_chain_test:multiple_transforms_chain_tab",
+    "buffer.count.records":"2",
+    "buffer.flush.time":"11",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"transforms_msg",
+    "load.model":"stream_load",
+    "transforms":"extractField,renameField",
+    "transforms.extractField.type": "org.apache.kafka.connect.transforms.ExtractField$Value",
+    "transforms.extractField.field": "content",
+    "transforms.renameField.type":"org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.renameField.renames":"old_col1:col1",
+    "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "value.converter":"org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false"
+  }
+}
