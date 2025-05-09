@@ -56,6 +56,7 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
             LOG.info("already start task with key {}", writerKey);
         } else {
             String topic = topicPartition.topic();
+
             // Only by topic
             int partition = -1;
             DorisWriter dorisWriter =
@@ -79,10 +80,9 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
 
             String topic = record.topic();
             int partition = record.kafkaPartition();
-            if (!topicPartitionOffset.containsKey(topic)) {
-                topicPartitionOffset.put(topic, new HashMap<>());
-            }
-            topicPartitionOffset.get(topic).put(partition, record.kafkaOffset());
+            topicPartitionOffset
+                    .computeIfAbsent(topic, k -> new HashMap<>())
+                    .put(partition, record.kafkaOffset());
             // Might happen a count of record based flushing，buffer
             insert(record);
         }
