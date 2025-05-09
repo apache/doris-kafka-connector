@@ -48,16 +48,16 @@ public class DorisSinkConnectorConfig {
     // Connector config
     private static final String CONNECTOR_CONFIG = "Connector Config";
     public static final String BUFFER_COUNT_RECORDS = "buffer.count.records";
-    public static final long BUFFER_COUNT_RECORDS_DEFAULT = 10000;
+    public static final long BUFFER_COUNT_RECORDS_DEFAULT = 50000;
     public static final String BUFFER_SIZE_BYTES = "buffer.size.bytes";
-    public static final long BUFFER_SIZE_BYTES_DEFAULT = 5000000;
+    public static final long BUFFER_SIZE_BYTES_DEFAULT = 100 * 1024 * 1024;
     public static final long BUFFER_SIZE_BYTES_MIN = 1;
     public static final String TOPICS_TABLES_MAP = "doris.topic2table.map";
     public static final String RECORD_TABLE_NAME_FIELD = "record.tablename.field";
     public static final String LABEL_PREFIX = "label.prefix";
 
     // Time in seconds
-    public static final long BUFFER_FLUSH_TIME_SEC_MIN = 10;
+    public static final long BUFFER_FLUSH_TIME_SEC_MIN = 1;
     public static final long BUFFER_FLUSH_TIME_SEC_DEFAULT = 120;
     public static final String BUFFER_FLUSH_TIME_SEC = "buffer.flush.time";
 
@@ -81,6 +81,8 @@ public class DorisSinkConnectorConfig {
     public static final String AUTO_REDIRECT = "auto.redirect";
     public static final String DELIVERY_GUARANTEE = "delivery.guarantee";
     public static final String DELIVERY_GUARANTEE_DEFAULT = DeliveryGuarantee.AT_LEAST_ONCE.name();
+    public static final String ENABLE_COMBINE_FLUSH = "enable.combine.flush";
+    public static final String ENABLE_COMBINE_FLUSH_DEFAULT = "false";
     public static final String CONVERTER_MODE = "converter.mode";
     public static final String CONVERT_MODE_DEFAULT = ConverterMode.NORMAL.getName();
 
@@ -130,6 +132,7 @@ public class DorisSinkConnectorConfig {
         setFieldToDefaultValues(
                 config, RETRY_INTERVAL_MS, String.valueOf(RETRY_INTERVAL_MS_DEFAULT));
         setFieldToDefaultValues(config, BEHAVIOR_ON_NULL_VALUES, BEHAVIOR_ON_NULL_VALUES_DEFAULT);
+        setFieldToDefaultValues(config, ENABLE_COMBINE_FLUSH, ENABLE_COMBINE_FLUSH_DEFAULT);
     }
 
     public static Map<String, String> convertToLowercase(Map<String, String> config) {

@@ -70,6 +70,7 @@ public class DorisOptions {
     private final int maxRetries;
     private final int retryIntervalMs;
     private final BehaviorOnNullValues behaviorOnNullValues;
+    private final boolean enableCombineFlush;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -84,6 +85,8 @@ public class DorisOptions {
         this.loadModel = LoadModel.of(config.get(DorisSinkConnectorConfig.LOAD_MODEL));
         this.deliveryGuarantee =
                 DeliveryGuarantee.of(config.get(DorisSinkConnectorConfig.DELIVERY_GUARANTEE));
+        this.enableCombineFlush =
+                Boolean.valueOf(config.get(DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH));
         this.converterMode = ConverterMode.of(config.get(DorisSinkConnectorConfig.CONVERTER_MODE));
         this.schemaEvolutionMode =
                 SchemaEvolutionMode.of(
@@ -349,5 +352,9 @@ public class DorisOptions {
 
     public BehaviorOnNullValues getBehaviorOnNullValues() {
         return behaviorOnNullValues;
+    }
+
+    public boolean isEnableCombineFlush() {
+        return enableCombineFlush;
     }
 }

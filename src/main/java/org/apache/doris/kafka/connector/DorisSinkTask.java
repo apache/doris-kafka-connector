@@ -55,7 +55,7 @@ public class DorisSinkTask extends SinkTask {
         LOG.info("kafka doris sink task start with {}", parsedConfig);
         this.options = new DorisOptions(parsedConfig);
         this.remainingRetries = options.getMaxRetries();
-        this.sink = DorisSinkServiceFactory.getDorisSinkService(parsedConfig, context);
+        this.sink = DorisSinkServiceFactory.getDorisSinkService(parsedConfig, context, options);
     }
 
     /**
