@@ -101,14 +101,21 @@ public class DorisOptions {
                         config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP));
         this.tableNameField = config.get(DorisSinkConnectorConfig.RECORD_TABLE_NAME_FIELD);
 
-        if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
-            if (Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC))) {
-                this.enable2PC = true;
-                this.force2PC = true;
-            } else {
-                this.enable2PC = false;
+        if (enableCombineFlush) {
+            LOG.info("Enable combine flush, set 2pc to false.");
+            this.enable2PC = false;
+            this.force2PC = false;
+        } else {
+            if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
+                if (Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC))) {
+                    this.enable2PC = true;
+                    this.force2PC = true;
+                } else {
+                    this.enable2PC = false;
+                }
             }
         }
+
         this.enableCustomJMX = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.JMX_OPT));
         this.enableDelete =
                 Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_DELETE));

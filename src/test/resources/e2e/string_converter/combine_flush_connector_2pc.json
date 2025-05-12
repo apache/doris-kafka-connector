@@ -1,0 +1,23 @@
+{
+  "name":"combine_flush_connector_2pc",
+  "config":{
+    "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
+    "topics":"combine_test_2pc",
+    "tasks.max":"1",
+    "doris.topic2table.map": "combine_test_2pc:combine_flush_tab_2pc",
+    "buffer.count.records":"100",
+    "buffer.flush.time":"1",
+    "buffer.size.bytes":"10000000",
+    "doris.urls":"127.0.0.1",
+    "doris.user":"root",
+    "doris.password":"",
+    "doris.http.port":"8030",
+    "doris.query.port":"9030",
+    "doris.database":"combine_flush_2pc",
+    "load.model":"stream_load",
+    "enable.combine.flush":"true",
+    "enable.2pc": "true",
+    "key.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "value.converter":"org.apache.kafka.connect.storage.StringConverter"
+  }
+}
