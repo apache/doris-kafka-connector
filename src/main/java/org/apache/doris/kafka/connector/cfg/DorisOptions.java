@@ -70,6 +70,7 @@ public class DorisOptions {
     private final int maxRetries;
     private final int retryIntervalMs;
     private final BehaviorOnNullValues behaviorOnNullValues;
+    private final boolean enableCombineFlush;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -84,6 +85,8 @@ public class DorisOptions {
         this.loadModel = LoadModel.of(config.get(DorisSinkConnectorConfig.LOAD_MODEL));
         this.deliveryGuarantee =
                 DeliveryGuarantee.of(config.get(DorisSinkConnectorConfig.DELIVERY_GUARANTEE));
+        this.enableCombineFlush =
+                Boolean.valueOf(config.get(DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH));
         this.converterMode = ConverterMode.of(config.get(DorisSinkConnectorConfig.CONVERTER_MODE));
         this.schemaEvolutionMode =
                 SchemaEvolutionMode.of(
@@ -98,14 +101,21 @@ public class DorisOptions {
                         config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP));
         this.tableNameField = config.get(DorisSinkConnectorConfig.RECORD_TABLE_NAME_FIELD);
 
-        if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
-            if (Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC))) {
-                this.enable2PC = true;
-                this.force2PC = true;
-            } else {
-                this.enable2PC = false;
+        if (enableCombineFlush) {
+            LOG.info("Enable combine flush, set 2pc to false.");
+            this.enable2PC = false;
+            this.force2PC = false;
+        } else {
+            if (config.containsKey(DorisSinkConnectorConfig.ENABLE_2PC)) {
+                if (Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_2PC))) {
+                    this.enable2PC = true;
+                    this.force2PC = true;
+                } else {
+                    this.enable2PC = false;
+                }
             }
         }
+
         this.enableCustomJMX = Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.JMX_OPT));
         this.enableDelete =
                 Boolean.parseBoolean(config.get(DorisSinkConnectorConfig.ENABLE_DELETE));
@@ -349,5 +359,9 @@ public class DorisOptions {
 
     public BehaviorOnNullValues getBehaviorOnNullValues() {
         return behaviorOnNullValues;
+    }
+
+    public boolean isEnableCombineFlush() {
+        return enableCombineFlush;
     }
 }

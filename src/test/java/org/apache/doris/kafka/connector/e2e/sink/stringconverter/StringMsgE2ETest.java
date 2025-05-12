@@ -411,6 +411,68 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         checkResult(expected, query1, 3);
     }
 
+    @Test
+    public void testCombineFlush() throws IOException, InterruptedException, SQLException {
+        initialize("src/test/resources/e2e/string_converter/combine_flush_connector.json");
+        Thread.sleep(5000);
+        String topic = "combine_test";
+        String msg = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
+
+        produceMsg2Kafka(topic, msg);
+        String tableSql =
+                loadContent("src/test/resources/e2e/string_converter/combine_flush_tab.sql");
+        createTable(tableSql);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        String table = dorisOptions.getTopicMapTable(topic);
+        Statement statement = getJdbcConnection().createStatement();
+        String querySql = "select * from " + database + "." + table;
+        LOG.info("start to query result from doris. sql={}", querySql);
+        ResultSet resultSet = statement.executeQuery(querySql);
+
+        Assert.assertTrue(resultSet.next());
+
+        int id = resultSet.getInt("id");
+        String name = resultSet.getString("name");
+        int age = resultSet.getInt("age");
+        LOG.info("Query result is id={}, name={}, age={}", id, name, age);
+
+        Assert.assertEquals(1, id);
+        Assert.assertEquals("zhangsan", name);
+        Assert.assertEquals(12, age);
+    }
+
+    @Test
+    public void testCombineFlush2PC() throws IOException, InterruptedException, SQLException {
+        initialize("src/test/resources/e2e/string_converter/combine_flush_connector_2pc.json");
+        Thread.sleep(5000);
+        String topic = "combine_test_2pc";
+        String msg = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
+
+        produceMsg2Kafka(topic, msg);
+        String tableSql =
+                loadContent("src/test/resources/e2e/string_converter/combine_flush_tab_2pc.sql");
+        createTable(tableSql);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+
+        String table = dorisOptions.getTopicMapTable(topic);
+        Statement statement = getJdbcConnection().createStatement();
+        String querySql = "select * from " + database + "." + table;
+        LOG.info("start to query result from doris. sql={}", querySql);
+        ResultSet resultSet = statement.executeQuery(querySql);
+
+        Assert.assertTrue(resultSet.next());
+
+        int id = resultSet.getInt("id");
+        String name = resultSet.getString("name");
+        int age = resultSet.getInt("age");
+        LOG.info("Query result is id={}, name={}, age={}", id, name, age);
+
+        Assert.assertEquals(1, id);
+        Assert.assertEquals("zhangsan", name);
+        Assert.assertEquals(12, age);
+    }
+
     @AfterClass
     public static void closeInstance() {
         kafkaContainerService.deleteKafkaConnector(connectorName);

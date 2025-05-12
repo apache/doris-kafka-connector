@@ -64,13 +64,13 @@ import org.slf4j.LoggerFactory;
 public class DorisDefaultSinkService implements DorisSinkService {
     private static final Logger LOG = LoggerFactory.getLogger(DorisDefaultSinkService.class);
 
-    private final ConnectionProvider conn;
-    private final Map<String, DorisWriter> writer;
-    private final DorisOptions dorisOptions;
-    private final MetricsJmxReporter metricsJmxReporter;
-    private final DorisConnectMonitor connectMonitor;
-    private final ObjectMapper objectMapper;
-    private final SinkTaskContext context;
+    protected final ConnectionProvider conn;
+    protected final Map<String, DorisWriter> writer;
+    protected final DorisOptions dorisOptions;
+    protected final MetricsJmxReporter metricsJmxReporter;
+    protected final DorisConnectMonitor connectMonitor;
+    protected final ObjectMapper objectMapper;
+    protected final SinkTaskContext context;
 
     DorisDefaultSinkService(Map<String, String> config, SinkTaskContext context) {
         this.dorisOptions = new DorisOptions(config);
