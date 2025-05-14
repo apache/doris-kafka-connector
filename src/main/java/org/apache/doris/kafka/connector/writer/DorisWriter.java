@@ -42,7 +42,7 @@ public abstract class DorisWriter {
     protected String dbName;
     protected final String tableIdentifier;
     protected List<String> fileNames;
-    private RecordBuffer buffer;
+    protected RecordBuffer buffer;
     protected final AtomicLong committedOffset; // loaded offset + 1
     protected final AtomicLong flushedOffset; // flushed offset
     protected final AtomicLong processedOffset; // processed offset

@@ -22,8 +22,8 @@ package org.apache.doris.kafka.connector.service;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.doris.kafka.connector.writer.AsyncStreamLoadWriter;
 import org.apache.doris.kafka.connector.writer.DorisWriter;
-import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -60,8 +60,9 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
             // Only by topic
             int partition = -1;
             DorisWriter dorisWriter =
-                    new StreamLoadWriter(
+                    new AsyncStreamLoadWriter(
                             tableName, topic, partition, dorisOptions, conn, connectMonitor);
+
             writer.put(writerKey, dorisWriter);
             metricsJmxReporter.start();
         }
