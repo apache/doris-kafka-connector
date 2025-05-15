@@ -20,8 +20,6 @@
 package org.apache.doris.kafka.connector.e2e.sink.stringconverter;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -39,13 +37,10 @@ import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** DorisSinkFailoverSinkTest is a test class for Doris Sink Connector. */
-@RunWith(Parameterized.class)
 public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     private static final Logger LOG = LoggerFactory.getLogger(DorisSinkFailoverSinkTest.class);
     private static String connectorName;
@@ -62,11 +57,6 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     public static void setUp() {
         initServer();
         initProducer();
-    }
-
-    @Parameterized.Parameters(name = "enableCombineFlush: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {true}, new Object[] {true}};
     }
 
     public static void initialize(String connectorPath) {
@@ -100,26 +90,32 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     public void testStreamLoadFailoverSink() throws Exception {
         LOG.info("start to test testStreamLoadFailoverSink.");
         initialize("src/test/resources/e2e/string_converter/string_msg_failover_connector.json");
-
-        // replace file path
-        String connectJson =
-                loadContent(
-                        "src/test/resources/e2e/string_converter/string_msg_failover_connector.json");
-        JsonNode jsonNode = new ObjectMapper().readTree(connectJson);
-        ObjectNode configNode = (ObjectNode) jsonNode.get("config");
-
-        configNode.put(DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH, enableCombineFlush);
-        jsonMsgConnectorContent = new ObjectMapper().writeValueAsString(jsonNode);
-
-        Thread.sleep(5000);
         String topic = "string_test_failover";
         String msg1 = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
         produceMsg2Kafka(topic, msg1);
-
         String tableSql =
                 loadContent("src/test/resources/e2e/string_converter/string_msg_tab_failover.sql");
         createTable(tableSql);
+        startCheck(topic);
+    }
 
+    /** mock streamload failure */
+    @Test
+    public void testStreamLoadFailoverSinkCombineFlush() throws Exception {
+        LOG.info("start to test testStreamLoadFailoverSinkCombineFlush.");
+        initialize(
+                "src/test/resources/e2e/string_converter/string_msg_failover_connector_uniq.json");
+        String topic = "string_test_failover_uniq";
+        String msg1 = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
+        produceMsg2Kafka(topic, msg1);
+        String tableSql =
+                loadContent(
+                        "src/test/resources/e2e/string_converter/string_msg_tab_failover_uniq.sql");
+        createTable(tableSql);
+        startCheck(topic);
+    }
+
+    public void startCheck(String topic) throws Exception {
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
 
         String table = dorisOptions.getTopicMapTable(topic);
