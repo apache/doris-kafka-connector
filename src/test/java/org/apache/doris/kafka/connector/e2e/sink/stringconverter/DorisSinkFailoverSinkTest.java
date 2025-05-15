@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 
 /** DorisSinkFailoverSinkTest is a test class for Doris Sink Connector. */
 @RunWith(Parameterized.class)
-@Ignore
 public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     private static final Logger LOG = LoggerFactory.getLogger(DorisSinkFailoverSinkTest.class);
     private static String connectorName;
@@ -93,7 +92,7 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     }
 
     private static void setTimeZone() {
-        executeSql(getJdbcConnection(), "set global time_zone = 'Asia/Shanghai'");
+        executeSql("set global time_zone = 'Asia/Shanghai'");
     }
 
     /** mock streamload failure */
@@ -127,8 +126,9 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
         String querySql =
                 String.format("select id,name,age from %s.%s order by id", database, table);
         LOG.info("start to query result from doris. sql={}", querySql);
+        Connection jdbcConnection = getJdbcConnection();
         while (true) {
-            List<String> result = executeSQLStatement(getJdbcConnection(), LOG, querySql, 3);
+            List<String> result = executeSQLStatement(jdbcConnection, LOG, querySql, 3);
             // until load success one time
             if (result.size() >= 1) {
                 faultInjectionOpen();

@@ -80,7 +80,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
     }
 
     private static void setTimeZone() {
-        executeSql(getJdbcConnection(), "set global time_zone = 'Asia/Shanghai'");
+        executeSql("set global time_zone = 'Asia/Shanghai'");
     }
 
     @Test

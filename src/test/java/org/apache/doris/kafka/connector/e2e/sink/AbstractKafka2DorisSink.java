@@ -115,11 +115,12 @@ public abstract class AbstractKafka2DorisSink {
         }
     }
 
-    protected static void executeSql(Connection connection, String... sql) {
+    protected static void executeSql(String... sql) {
         if (sql == null || sql.length == 0) {
             return;
         }
-        try (Statement statement = connection.createStatement()) {
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
             for (String s : sql) {
                 if (StringUtils.isNotEmpty(s)) {
                     statement.execute(s);
