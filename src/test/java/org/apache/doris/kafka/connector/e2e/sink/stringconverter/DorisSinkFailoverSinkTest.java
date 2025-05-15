@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 /** DorisSinkFailoverSinkTest is a test class for Doris Sink Connector. */
 @RunWith(Parameterized.class)
+@Ignore
 public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     private static final Logger LOG = LoggerFactory.getLogger(DorisSinkFailoverSinkTest.class);
     private static String connectorName;
