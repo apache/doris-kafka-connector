@@ -112,6 +112,7 @@ public class AsyncDorisStreamLoad extends DataLoad {
     }
 
     public void forceLoad() {
+        checkFlushException();
         waitAsyncLoadFinish();
     }
 
