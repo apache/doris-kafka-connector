@@ -96,6 +96,7 @@ public class DorisContainerServiceImpl implements DorisContainerService {
             // singleton doris container
             dorisContainer.start();
             initializeJdbcConnection();
+            initializeVariables();
             printClusterStatus();
         } catch (Exception ex) {
             LOG.error("Failed to start containers doris", ex);
@@ -135,6 +136,20 @@ public class DorisContainerServiceImpl implements DorisContainerService {
             } while (!isBeReady(resultSet, Duration.ofSeconds(1L)));
         }
         LOG.info("Connected to Doris successfully.");
+    }
+
+    private void initializeVariables() throws Exception {
+        try (Connection connection =
+                        DriverManager.getConnection(
+                                String.format(JDBC_URL, dorisContainer.getHost()),
+                                USERNAME,
+                                PASSWORD);
+                Statement statement = connection.createStatement()) {
+            LOG.info("init doris cluster variables.");
+            // avoid arrow flight sql reading bug
+            statement.executeQuery("SET PROPERTY FOR 'root' 'max_user_connections' = '1024';");
+        }
+        LOG.info("Init variables successfully.");
     }
 
     private boolean isBeReady(ResultSet rs, Duration duration) throws SQLException {
