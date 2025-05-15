@@ -115,11 +115,12 @@ public abstract class AbstractKafka2DorisSink {
         }
     }
 
-    protected static void executeSql(Connection connection, String... sql) {
+    protected static void executeSql(String... sql) {
         if (sql == null || sql.length == 0) {
             return;
         }
-        try (Statement statement = connection.createStatement()) {
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
             for (String s : sql) {
                 if (StringUtils.isNotEmpty(s)) {
                     statement.execute(s);
@@ -133,8 +134,8 @@ public abstract class AbstractKafka2DorisSink {
 
     protected static void createDatabase(String databaseName) {
         LOG.info("Will to be create database, sql={}", databaseName);
-        try {
-            Statement statement = getJdbcConnection().createStatement();
+        try (Connection conn = getJdbcConnection();
+                Statement statement = conn.createStatement()) {
             statement.execute("create database if not exists " + databaseName);
         } catch (SQLException e) {
             throw new DorisException("Failed to create doris table.", e);
@@ -144,8 +145,8 @@ public abstract class AbstractKafka2DorisSink {
 
     protected void createTable(String sql) {
         LOG.info("Will to be create doris table, sql={}", sql);
-        try {
-            Statement statement = getJdbcConnection().createStatement();
+        try (Connection conn = getJdbcConnection();
+                Statement statement = conn.createStatement()) {
             statement.execute(sql);
         } catch (SQLException e) {
             throw new DorisException("Failed to create doris table.", e);
@@ -155,8 +156,8 @@ public abstract class AbstractKafka2DorisSink {
 
     protected void insertTable(String sql) {
         LOG.info("Will insert data to Doris table. SQL: {}", sql);
-        try {
-            Statement statement = getJdbcConnection().createStatement();
+        try (Connection conn = getJdbcConnection();
+                Statement statement = conn.createStatement()) {
             int rowCount = statement.executeUpdate(sql);
             LOG.info("Inserted {} item data into the Doris table.", rowCount);
         } catch (SQLException e) {
@@ -184,7 +185,8 @@ public abstract class AbstractKafka2DorisSink {
     public void checkResult(List<String> expected, String query, int columnSize) throws Exception {
         List<String> actual = new ArrayList<>();
 
-        try (Statement statement = getJdbcConnection().createStatement()) {
+        try (Connection conn = getJdbcConnection();
+                Statement statement = conn.createStatement()) {
             ResultSet sinkResultSet = statement.executeQuery(query);
             while (sinkResultSet.next()) {
                 List<String> row = new ArrayList<>();

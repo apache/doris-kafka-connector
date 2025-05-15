@@ -66,6 +66,7 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
         JsonNode configNode = rootNode.get(CONFIG);
         Map<String, String> configMap = objectMapper.convertValue(configNode, Map.class);
         configMap.put(ConfigCheckUtils.TASK_ID, "1");
+
         Map<String, String> lowerCaseConfigMap =
                 DorisSinkConnectorConfig.convertToLowercase(configMap);
         DorisSinkConnectorConfig.setDefaultValues(lowerCaseConfigMap);
@@ -76,7 +77,7 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     }
 
     private static void setTimeZone() {
-        executeSql(getJdbcConnection(), "set global time_zone = 'Asia/Shanghai'");
+        executeSql("set global time_zone = 'Asia/Shanghai'");
     }
 
     /** mock streamload failure */
@@ -84,23 +85,41 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     public void testStreamLoadFailoverSink() throws Exception {
         LOG.info("start to test testStreamLoadFailoverSink.");
         initialize("src/test/resources/e2e/string_converter/string_msg_failover_connector.json");
-        Thread.sleep(5000);
         String topic = "string_test_failover";
         String msg1 = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
         produceMsg2Kafka(topic, msg1);
-
         String tableSql =
                 loadContent("src/test/resources/e2e/string_converter/string_msg_tab_failover.sql");
         createTable(tableSql);
+        startCheck(topic);
+    }
 
+    /** mock streamload failure */
+    @Test
+    public void testStreamLoadFailoverSinkCombineFlush() throws Exception {
+        LOG.info("start to test testStreamLoadFailoverSinkCombineFlush.");
+        initialize(
+                "src/test/resources/e2e/string_converter/string_msg_failover_connector_uniq.json");
+        String topic = "string_test_failover_uniq";
+        String msg1 = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
+        produceMsg2Kafka(topic, msg1);
+        String tableSql =
+                loadContent(
+                        "src/test/resources/e2e/string_converter/string_msg_tab_failover_uniq.sql");
+        createTable(tableSql);
+        startCheck(topic);
+    }
+
+    public void startCheck(String topic) throws Exception {
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
 
         String table = dorisOptions.getTopicMapTable(topic);
         String querySql =
                 String.format("select id,name,age from %s.%s order by id", database, table);
         LOG.info("start to query result from doris. sql={}", querySql);
+        Connection jdbcConnection = getJdbcConnection();
         while (true) {
-            List<String> result = executeSQLStatement(getJdbcConnection(), LOG, querySql, 3);
+            List<String> result = executeSQLStatement(jdbcConnection, LOG, querySql, 3);
             // until load success one time
             if (result.size() >= 1) {
                 faultInjectionOpen();
@@ -111,7 +130,7 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
                 faultInjectionClear();
                 break;
             } else {
-                Thread.sleep(100);
+                Thread.sleep(1000);
             }
         }
 

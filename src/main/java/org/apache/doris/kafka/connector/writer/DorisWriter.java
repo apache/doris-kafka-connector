@@ -42,7 +42,7 @@ public abstract class DorisWriter {
     protected String dbName;
     protected final String tableIdentifier;
     protected List<String> fileNames;
-    private RecordBuffer buffer;
+    protected RecordBuffer buffer;
     protected final AtomicLong committedOffset; // loaded offset + 1
     protected final AtomicLong flushedOffset; // flushed offset
     protected final AtomicLong processedOffset; // processed offset
@@ -173,6 +173,11 @@ public abstract class DorisWriter {
     public boolean shouldFlush() {
         return (System.currentTimeMillis() - this.previousFlushTimeStamp)
                 >= (dorisOptions.getFlushTime() * 1000);
+    }
+
+    // for combine flush
+    public void flushBuffer(boolean waitUntilDone) {
+        flushBuffer();
     }
 
     public void flushBuffer() {
