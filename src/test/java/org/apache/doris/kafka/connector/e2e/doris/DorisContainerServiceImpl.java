@@ -147,7 +147,7 @@ public class DorisContainerServiceImpl implements DorisContainerService {
                 Statement statement = connection.createStatement()) {
             LOG.info("init doris cluster variables.");
             // avoid arrow flight sql reading bug
-            statement.executeQuery("SET PROPERTY FOR 'root' 'max_user_connections' = '1024';");
+            statement.execute("SET PROPERTY FOR 'root' 'max_user_connections' = '1024';");
         }
         LOG.info("Init variables successfully.");
     }
