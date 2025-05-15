@@ -46,6 +46,11 @@ public class AsyncStreamLoadWriter extends StreamLoadWriter {
                 new AsyncDorisStreamLoad(backendUtils, dorisOptions, topic, this.tableName);
     }
 
+    /** start async thread stream load */
+    public void start() {
+        this.dorisStreamLoad.start();
+    }
+
     protected void flush(final RecordBuffer buff) {
         String label = labelGenerator.generateLabel(buff.getLastOffset());
         dorisStreamLoad.asyncLoad(label, buff);
@@ -56,12 +61,18 @@ public class AsyncStreamLoadWriter extends StreamLoadWriter {
         connectMonitor.addAndGetTotalNumberOfRecord(buff.getNumOfRecords());
     }
 
+    public void flushBuffer(boolean waitUtilDone) {
+        flushBuffer();
+        if (waitUtilDone) {
+            dorisStreamLoad.forceLoad();
+        }
+    }
+
     public void flushBuffer() {
         if (!buffer.isEmpty()) {
             RecordBuffer tmpBuff = buffer;
             this.buffer = new RecordBuffer();
             flush(tmpBuff);
         }
-        dorisStreamLoad.forceLoad();
     }
 }

@@ -28,6 +28,9 @@ import org.apache.kafka.connect.sink.SinkRecord;
 /** Background service of data sink, responsible to create/drop table and insert/delete files */
 public interface DorisSinkService {
 
+    /** init task for writer */
+    void init();
+
     /**
      * Start the Task.
      *

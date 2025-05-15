@@ -20,6 +20,8 @@
 package org.apache.doris.kafka.connector.e2e.sink.stringconverter;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -37,21 +39,34 @@ import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** DorisSinkFailoverSinkTest is a test class for Doris Sink Connector. */
+@RunWith(Parameterized.class)
 public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     private static final Logger LOG = LoggerFactory.getLogger(DorisSinkFailoverSinkTest.class);
     private static String connectorName;
     private static String jsonMsgConnectorContent;
     private static DorisOptions dorisOptions;
     private static String database;
+    private boolean enableCombineFlush;
+
+    public DorisSinkFailoverSinkTest(boolean enableCombineFlush) {
+        this.enableCombineFlush = enableCombineFlush;
+    }
 
     @BeforeClass
     public static void setUp() {
         initServer();
         initProducer();
+    }
+
+    @Parameterized.Parameters(name = "enableCombineFlush: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {true}, new Object[] {true}};
     }
 
     public static void initialize(String connectorPath) {
@@ -66,6 +81,7 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
         JsonNode configNode = rootNode.get(CONFIG);
         Map<String, String> configMap = objectMapper.convertValue(configNode, Map.class);
         configMap.put(ConfigCheckUtils.TASK_ID, "1");
+
         Map<String, String> lowerCaseConfigMap =
                 DorisSinkConnectorConfig.convertToLowercase(configMap);
         DorisSinkConnectorConfig.setDefaultValues(lowerCaseConfigMap);
@@ -84,6 +100,17 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     public void testStreamLoadFailoverSink() throws Exception {
         LOG.info("start to test testStreamLoadFailoverSink.");
         initialize("src/test/resources/e2e/string_converter/string_msg_failover_connector.json");
+
+        // replace file path
+        String connectJson =
+                loadContent(
+                        "src/test/resources/e2e/string_converter/string_msg_failover_connector.json");
+        JsonNode jsonNode = new ObjectMapper().readTree(connectJson);
+        ObjectNode configNode = (ObjectNode) jsonNode.get("config");
+
+        configNode.put(DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH, enableCombineFlush);
+        jsonMsgConnectorContent = new ObjectMapper().writeValueAsString(jsonNode);
+
         Thread.sleep(5000);
         String topic = "string_test_failover";
         String msg1 = "{\"id\":1,\"name\":\"zhangsan\",\"age\":12}";
@@ -111,7 +138,7 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
                 faultInjectionClear();
                 break;
             } else {
-                Thread.sleep(100);
+                Thread.sleep(1000);
             }
         }
 

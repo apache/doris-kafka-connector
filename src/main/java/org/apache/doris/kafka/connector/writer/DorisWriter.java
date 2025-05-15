@@ -175,6 +175,11 @@ public abstract class DorisWriter {
                 >= (dorisOptions.getFlushTime() * 1000);
     }
 
+    // for combine flush
+    public void flushBuffer(boolean waitUntilDone) {
+        flushBuffer();
+    }
+
     public void flushBuffer() {
         if (buffer.isEmpty()) {
             return;

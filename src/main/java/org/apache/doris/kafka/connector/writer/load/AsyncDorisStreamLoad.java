@@ -83,7 +83,6 @@ public class AsyncDorisStreamLoad extends DataLoad {
         this.backendUtils = backendUtils;
         this.topic = topic;
         this.enableGroupCommit = dorisOptions.enableGroupCommit();
-
         this.loadAsyncExecutor = new LoadAsyncExecutor();
         this.loadExecutorService =
                 new ThreadPoolExecutor(
@@ -94,8 +93,16 @@ public class AsyncDorisStreamLoad extends DataLoad {
                         new LinkedBlockingQueue<>(1),
                         new DefaultThreadFactory("streamload-executor"),
                         new ThreadPoolExecutor.AbortPolicy());
+
+        start();
         this.started = new AtomicBoolean(true);
-        this.loadExecutorService.execute(loadAsyncExecutor);
+    }
+
+    public void start() {
+        if (!loadThreadAlive) {
+            this.loadExecutorService.execute(loadAsyncExecutor);
+            this.exception.set(null);
+        }
     }
 
     public void asyncLoad(String label, RecordBuffer buffer) {
@@ -131,6 +138,13 @@ public class AsyncDorisStreamLoad extends DataLoad {
     private void checkFlushException() {
         if (exception.get() != null) {
             throw new DorisException(exception.get());
+        }
+    }
+
+    public void close() {
+        if (started.compareAndSet(true, false)) {
+            LOG.info("close executorService");
+            loadExecutorService.shutdown();
         }
     }
 

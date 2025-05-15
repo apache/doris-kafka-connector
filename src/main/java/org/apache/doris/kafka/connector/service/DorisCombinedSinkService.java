@@ -34,12 +34,22 @@ import org.slf4j.LoggerFactory;
 /** Combined all partitions and write once. */
 public class DorisCombinedSinkService extends DorisDefaultSinkService {
     private static final Logger LOG = LoggerFactory.getLogger(DorisCombinedSinkService.class);
-
     private final Map<String, HashMap<Integer, Long>> topicPartitionOffset;
 
     DorisCombinedSinkService(Map<String, String> config, SinkTaskContext context) {
         super(config, context);
         this.topicPartitionOffset = new HashMap<>();
+    }
+
+    @Override
+    public void init() {
+        for (DorisWriter wr : writer.values()) {
+            if (wr instanceof AsyncStreamLoadWriter) {
+                // When the stream load asynchronous thread down,
+                // it needs to be restarted when retrying
+                ((AsyncStreamLoadWriter) wr).start();
+            }
+        }
     }
 
     /**
@@ -92,7 +102,7 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
         for (DorisWriter writer : writer.values()) {
             // Time based flushing
             if (writer.shouldFlush()) {
-                writer.flushBuffer();
+                writer.flushBuffer(false);
             }
         }
     }
@@ -124,7 +134,7 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
         // Here we force flushing the data in memory once to
         // ensure that the offsets recorded in topicPartitionOffset have been flushed to doris
         for (DorisWriter writer : writer.values()) {
-            writer.flushBuffer();
+            writer.flushBuffer(true);
         }
     }
 
