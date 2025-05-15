@@ -47,11 +47,6 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
     private static String jsonMsgConnectorContent;
     private static DorisOptions dorisOptions;
     private static String database;
-    private boolean enableCombineFlush;
-
-    public DorisSinkFailoverSinkTest(boolean enableCombineFlush) {
-        this.enableCombineFlush = enableCombineFlush;
-    }
 
     @BeforeClass
     public static void setUp() {
