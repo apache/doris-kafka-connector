@@ -21,6 +21,7 @@ package org.apache.doris.kafka.connector.e2e.sink.stringconverter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -74,7 +75,7 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
     }
 
     private static void setTimeZone() {
-        executeSql(getJdbcConnection(), "set global time_zone = 'Asia/Shanghai'");
+        executeSql("set global time_zone = 'Asia/Shanghai'");
     }
 
     @Test
@@ -88,23 +89,26 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         String tableSql = loadContent("src/test/resources/e2e/string_converter/string_msg_tab.sql");
         createTable(tableSql);
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+        Thread.sleep(20000);
 
         String table = dorisOptions.getTopicMapTable(topic);
-        Statement statement = getJdbcConnection().createStatement();
-        String querySql = "select * from " + database + "." + table;
-        LOG.info("start to query result from doris. sql={}", querySql);
-        ResultSet resultSet = statement.executeQuery(querySql);
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement(); ) {
+            String querySql = "select * from " + database + "." + table;
+            LOG.info("start to query result from doris. sql={}", querySql);
+            ResultSet resultSet = statement.executeQuery(querySql);
 
-        Assert.assertTrue(resultSet.next());
+            Assert.assertTrue(resultSet.next());
 
-        int id = resultSet.getInt("id");
-        String name = resultSet.getString("name");
-        int age = resultSet.getInt("age");
-        LOG.info("Query result is id={}, name={}, age={}", id, name, age);
+            int id = resultSet.getInt("id");
+            String name = resultSet.getString("name");
+            int age = resultSet.getInt("age");
+            LOG.info("Query result is id={}, name={}, age={}", id, name, age);
 
-        Assert.assertEquals(1, id);
-        Assert.assertEquals("zhangsan", name);
-        Assert.assertEquals(12, age);
+            Assert.assertEquals(1, id);
+            Assert.assertEquals("zhangsan", name);
+            Assert.assertEquals(12, age);
+        }
     }
 
     @Test
@@ -425,21 +429,23 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
 
         String table = dorisOptions.getTopicMapTable(topic);
-        Statement statement = getJdbcConnection().createStatement();
-        String querySql = "select * from " + database + "." + table;
-        LOG.info("start to query result from doris. sql={}", querySql);
-        ResultSet resultSet = statement.executeQuery(querySql);
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            String querySql = "select * from " + database + "." + table;
+            LOG.info("start to query result from doris. sql={}", querySql);
+            ResultSet resultSet = statement.executeQuery(querySql);
 
-        Assert.assertTrue(resultSet.next());
+            Assert.assertTrue(resultSet.next());
 
-        int id = resultSet.getInt("id");
-        String name = resultSet.getString("name");
-        int age = resultSet.getInt("age");
-        LOG.info("Query result is id={}, name={}, age={}", id, name, age);
+            int id = resultSet.getInt("id");
+            String name = resultSet.getString("name");
+            int age = resultSet.getInt("age");
+            LOG.info("Query result is id={}, name={}, age={}", id, name, age);
 
-        Assert.assertEquals(1, id);
-        Assert.assertEquals("zhangsan", name);
-        Assert.assertEquals(12, age);
+            Assert.assertEquals(1, id);
+            Assert.assertEquals("zhangsan", name);
+            Assert.assertEquals(12, age);
+        }
     }
 
     @Test
@@ -456,21 +462,23 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
 
         String table = dorisOptions.getTopicMapTable(topic);
-        Statement statement = getJdbcConnection().createStatement();
-        String querySql = "select * from " + database + "." + table;
-        LOG.info("start to query result from doris. sql={}", querySql);
-        ResultSet resultSet = statement.executeQuery(querySql);
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement(); ) {
+            String querySql = "select * from " + database + "." + table;
+            LOG.info("start to query result from doris. sql={}", querySql);
+            ResultSet resultSet = statement.executeQuery(querySql);
 
-        Assert.assertTrue(resultSet.next());
+            Assert.assertTrue(resultSet.next());
 
-        int id = resultSet.getInt("id");
-        String name = resultSet.getString("name");
-        int age = resultSet.getInt("age");
-        LOG.info("Query result is id={}, name={}, age={}", id, name, age);
+            int id = resultSet.getInt("id");
+            String name = resultSet.getString("name");
+            int age = resultSet.getInt("age");
+            LOG.info("Query result is id={}, name={}, age={}", id, name, age);
 
-        Assert.assertEquals(1, id);
-        Assert.assertEquals("zhangsan", name);
-        Assert.assertEquals(12, age);
+            Assert.assertEquals(1, id);
+            Assert.assertEquals("zhangsan", name);
+            Assert.assertEquals(12, age);
+        }
     }
 
     @AfterClass

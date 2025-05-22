@@ -88,6 +88,9 @@ public class DorisDefaultSinkService implements DorisSinkService {
     }
 
     @Override
+    public void init() {}
+
+    @Override
     public void startTask(TopicPartition topicPartition) {
         startTask(dorisOptions.getTopicMapTable(topicPartition.topic()), topicPartition);
     }
