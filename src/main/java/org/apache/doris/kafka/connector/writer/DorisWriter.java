@@ -116,8 +116,8 @@ public abstract class DorisWriter {
 
     protected void insertRecord(final SinkRecord record) {
         // discard the record if the record offset is smaller or equal to server side offset
-        if ((record.kafkaOffset() > this.offsetPersistedInDoris.get()
-                && record.kafkaOffset() > processedOffset.get())) {
+        if (record.kafkaOffset() > this.offsetPersistedInDoris.get()
+                && record.kafkaOffset() > processedOffset.get()) {
             SinkRecord dorisRecord = record;
             RecordBuffer tmpBuff = null;
 

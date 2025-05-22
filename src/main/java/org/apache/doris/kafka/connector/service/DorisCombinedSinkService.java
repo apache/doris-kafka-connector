@@ -125,6 +125,7 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
     public void commit(Map<TopicPartition, OffsetAndMetadata> offsets) {
         // Here we force flushing the data in memory once to
         // ensure that the offsets recorded in topicPartitionOffset have been flushed to doris
+        LOG.info("trigger flush by commit, topic {}", topicPartitionOffset.keySet());
         for (DorisWriter writer : writer.values()) {
             writer.commitFlush();
         }

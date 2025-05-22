@@ -104,14 +104,13 @@ public class AsyncStreamLoadWriter extends DorisWriter {
     }
 
     public synchronized void flushBuffer(boolean waitUtilDone) {
-        if (!waitUtilDone && buffer.isEmpty()) {
-            return;
-        }
-        RecordBuffer tmpBuff = buffer;
+        if (!buffer.isEmpty()) {
+            RecordBuffer tmpBuff = buffer;
 
-        String label = labelGenerator.generateLabel(tmpBuff.getLastOffset());
-        dorisStreamLoad.flush(label, tmpBuff);
-        this.buffer = new RecordBuffer();
+            String label = labelGenerator.generateLabel(tmpBuff.getLastOffset());
+            dorisStreamLoad.flush(label, tmpBuff);
+            this.buffer = new RecordBuffer();
+        }
 
         if (waitUtilDone) {
             dorisStreamLoad.forceFlush();
