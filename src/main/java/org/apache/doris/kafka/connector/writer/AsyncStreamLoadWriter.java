@@ -19,18 +19,24 @@
 
 package org.apache.doris.kafka.connector.writer;
 
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.utils.BackendUtils;
 import org.apache.doris.kafka.connector.writer.load.AsyncDorisStreamLoad;
+import org.apache.doris.kafka.connector.writer.load.DefaultThreadFactory;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class AsyncStreamLoadWriter extends StreamLoadWriter {
+public class AsyncStreamLoadWriter extends DorisWriter {
     private static final Logger LOG = LoggerFactory.getLogger(AsyncStreamLoadWriter.class);
     private final LabelGenerator labelGenerator;
     private AsyncDorisStreamLoad dorisStreamLoad;
+    private final transient ScheduledExecutorService scheduledExecutorService;
 
     public AsyncStreamLoadWriter(
             String tableName,
@@ -44,6 +50,16 @@ public class AsyncStreamLoadWriter extends StreamLoadWriter {
         BackendUtils backendUtils = BackendUtils.getInstance(dorisOptions, LOG);
         this.dorisStreamLoad =
                 new AsyncDorisStreamLoad(backendUtils, dorisOptions, topic, this.tableName);
+        this.scheduledExecutorService =
+                new ScheduledThreadPoolExecutor(
+                        1, new DefaultThreadFactory("stream-load-flush-interval"));
+        // when uploading data in streaming mode, we need to regularly detect whether there are
+        // exceptions.
+        scheduledExecutorService.scheduleWithFixedDelay(
+                this::intervalFlush,
+                dorisOptions.getFlushTime(),
+                dorisOptions.getFlushTime(),
+                TimeUnit.SECONDS);
     }
 
     /** start async thread stream load */
@@ -51,28 +67,74 @@ public class AsyncStreamLoadWriter extends StreamLoadWriter {
         this.dorisStreamLoad.start();
     }
 
-    protected void flush(final RecordBuffer buff) {
-        String label = labelGenerator.generateLabel(buff.getLastOffset());
-        dorisStreamLoad.asyncLoad(label, buff);
-
-        // update metrics
-        updateFlushedMetrics(buff);
-        connectMonitor.addAndGetTotalSizeOfData(buff.getBufferSizeBytes());
-        connectMonitor.addAndGetTotalNumberOfRecord(buff.getNumOfRecords());
+    public void insert(final SinkRecord dorisRecord) {
+        checkFlushException();
+        putBuffer(dorisRecord);
+        if (buffer.getBufferSizeBytes() >= dorisOptions.getFileSize()
+                || (dorisOptions.getRecordNum() != 0
+                        && buffer.getNumOfRecords() >= dorisOptions.getRecordNum())) {
+            LOG.info(
+                    "trigger flush by buffer size or count, buffer size: {}, num of records: {}, lastoffset : {}",
+                    buffer.getBufferSizeBytes(),
+                    buffer.getNumOfRecords(),
+                    buffer.getLastOffset());
+            bufferFullFlush();
+        }
     }
 
-    public void flushBuffer(boolean waitUtilDone) {
-        flushBuffer();
+    private void bufferFullFlush() {
+        doFlush(false, true);
+    }
+
+    private void intervalFlush() {
+        LOG.info("interval flush trigger");
+        doFlush(false, false);
+    }
+
+    public void commitFlush() {
+        doFlush(true, false);
+    }
+
+    private synchronized void doFlush(boolean waitUtilDone, boolean bufferFull) {
+        if (waitUtilDone || bufferFull) {
+            flushBuffer(waitUtilDone);
+        } else if (dorisStreamLoad.hasCapacity()) {
+            flushBuffer(false);
+        }
+    }
+
+    public synchronized void flushBuffer(boolean waitUtilDone) {
+        if (!waitUtilDone && buffer.isEmpty()) {
+            return;
+        }
+        RecordBuffer tmpBuff = buffer;
+
+        String label = labelGenerator.generateLabel(tmpBuff.getLastOffset());
+        dorisStreamLoad.flush(label, tmpBuff);
+        this.buffer = new RecordBuffer();
+
         if (waitUtilDone) {
-            dorisStreamLoad.forceLoad();
+            dorisStreamLoad.forceFlush();
         }
     }
 
-    public void flushBuffer() {
-        if (!buffer.isEmpty()) {
-            RecordBuffer tmpBuff = buffer;
-            this.buffer = new RecordBuffer();
-            flush(tmpBuff);
-        }
+    private void checkFlushException() {
+        dorisStreamLoad.checkException();
+    }
+
+    @Override
+    public void commit(int partition) {
+        // Won't go here
+    }
+
+    @Override
+    public long getOffset() {
+        // Won't go here
+        return 0;
+    }
+
+    @Override
+    public void fetchOffset() {
+        // Won't go here
     }
 }

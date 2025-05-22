@@ -97,14 +97,6 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
             // Might happen a count of record based flushing，buffer
             insert(record);
         }
-
-        // check all sink writer to see if they need to be flushed
-        for (DorisWriter writer : writer.values()) {
-            // Time based flushing
-            if (writer.shouldFlush()) {
-                writer.flushBuffer(false);
-            }
-        }
     }
 
     @Override
@@ -134,7 +126,7 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
         // Here we force flushing the data in memory once to
         // ensure that the offsets recorded in topicPartitionOffset have been flushed to doris
         for (DorisWriter writer : writer.values()) {
-            writer.flushBuffer(true);
+            writer.commitFlush();
         }
     }
 

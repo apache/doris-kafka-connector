@@ -30,11 +30,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.DorisException;
@@ -53,7 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AsyncDorisStreamLoad extends DataLoad {
-    private static final Logger LOG = LoggerFactory.getLogger(DorisStreamLoad.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AsyncDorisStreamLoad.class);
     private static final String LOAD_URL_PATTERN = "http://%s/api/%s/%s/_stream_load";
     private static final List<String> DORIS_SUCCESS_STATUS =
             new ArrayList<>(Arrays.asList(LoadStatus.SUCCESS, LoadStatus.PUBLISH_TIMEOUT));
@@ -105,18 +103,19 @@ public class AsyncDorisStreamLoad extends DataLoad {
         }
     }
 
-    public void asyncLoad(String label, RecordBuffer buffer) {
+    public void flush(String label, RecordBuffer buffer) {
         checkFlushException();
         buffer.setLabel(label);
         putRecordToFlushQueue(buffer);
     }
 
-    public void forceLoad() {
+    public void forceFlush() {
         checkFlushException();
         waitAsyncLoadFinish();
     }
 
     private void waitAsyncLoadFinish() {
+        // Make sure the data in the queue has been flushed
         for (int i = 0; i < 2; i++) {
             RecordBuffer empty = new RecordBuffer();
             putRecordToFlushQueue(empty);
@@ -149,6 +148,14 @@ public class AsyncDorisStreamLoad extends DataLoad {
         }
     }
 
+    public boolean hasCapacity() {
+        return flushQueue.remainingCapacity() > 0;
+    }
+
+    public void checkException() {
+        checkFlushException();
+    }
+
     class LoadAsyncExecutor implements Runnable {
 
         @Override
@@ -165,7 +172,6 @@ public class AsyncDorisStreamLoad extends DataLoad {
                         // When the label is empty, it is the eof buffer for checkpoint flush.
                         continue;
                     }
-
                     load(buffer.getLabel(), buffer);
 
                 } catch (Exception e) {
@@ -245,22 +251,6 @@ public class AsyncDorisStreamLoad extends DataLoad {
         private void refreshLoadUrl(String database, String table) {
             hostPort = backendUtils.getAvailableBackend();
             loadUrl = String.format(LOAD_URL_PATTERN, hostPort, database, table);
-        }
-    }
-
-    static class DefaultThreadFactory implements ThreadFactory {
-        private static final AtomicInteger poolNumber = new AtomicInteger(1);
-        private final AtomicInteger threadNumber = new AtomicInteger(1);
-        private final String namePrefix;
-
-        DefaultThreadFactory(String name) {
-            namePrefix = "pool-" + poolNumber.getAndIncrement() + "-" + name + "-";
-        }
-
-        public Thread newThread(Runnable r) {
-            Thread t = new Thread(r, namePrefix + threadNumber.getAndIncrement());
-            t.setDaemon(false);
-            return t;
         }
     }
 }
