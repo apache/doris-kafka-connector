@@ -87,7 +87,7 @@ public class AsyncStreamLoadWriter extends DorisWriter {
     }
 
     private void intervalFlush() {
-        LOG.info("interval flush trigger");
+        LOG.debug("interval flush trigger");
         doFlush(false, false);
     }
 
