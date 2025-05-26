@@ -109,6 +109,8 @@ public class DorisSinkTask extends SinkTask {
                         remainingRetries);
                 remainingRetries--;
                 context.timeout(options.getRetryIntervalMs());
+                // When writing asynchronously, need to restart the asynchronous thread
+                sink.init();
                 throw new RetriableException(ex);
             }
             throw ex;

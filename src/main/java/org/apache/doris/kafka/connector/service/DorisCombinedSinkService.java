@@ -22,8 +22,8 @@ package org.apache.doris.kafka.connector.service;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.doris.kafka.connector.writer.AsyncStreamLoadWriter;
 import org.apache.doris.kafka.connector.writer.DorisWriter;
-import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -34,12 +34,22 @@ import org.slf4j.LoggerFactory;
 /** Combined all partitions and write once. */
 public class DorisCombinedSinkService extends DorisDefaultSinkService {
     private static final Logger LOG = LoggerFactory.getLogger(DorisCombinedSinkService.class);
-
     private final Map<String, HashMap<Integer, Long>> topicPartitionOffset;
 
     DorisCombinedSinkService(Map<String, String> config, SinkTaskContext context) {
         super(config, context);
         this.topicPartitionOffset = new HashMap<>();
+    }
+
+    @Override
+    public void init() {
+        for (DorisWriter wr : writer.values()) {
+            if (wr instanceof AsyncStreamLoadWriter) {
+                // When the stream load asynchronous thread down,
+                // it needs to be restarted when retrying
+                ((AsyncStreamLoadWriter) wr).start();
+            }
+        }
     }
 
     /**
@@ -60,8 +70,9 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
             // Only by topic
             int partition = -1;
             DorisWriter dorisWriter =
-                    new StreamLoadWriter(
+                    new AsyncStreamLoadWriter(
                             tableName, topic, partition, dorisOptions, conn, connectMonitor);
+
             writer.put(writerKey, dorisWriter);
             metricsJmxReporter.start();
         }
@@ -85,14 +96,6 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
                     .put(partition, record.kafkaOffset());
             // Might happen a count of record based flushing，buffer
             insert(record);
-        }
-
-        // check all sink writer to see if they need to be flushed
-        for (DorisWriter writer : writer.values()) {
-            // Time based flushing
-            if (writer.shouldFlush()) {
-                writer.flushBuffer();
-            }
         }
     }
 
@@ -122,8 +125,9 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
     public void commit(Map<TopicPartition, OffsetAndMetadata> offsets) {
         // Here we force flushing the data in memory once to
         // ensure that the offsets recorded in topicPartitionOffset have been flushed to doris
+        LOG.info("trigger flush by commit, topic {}", topicPartitionOffset.keySet());
         for (DorisWriter writer : writer.values()) {
-            writer.flushBuffer();
+            writer.commitFlush();
         }
     }
 

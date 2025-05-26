@@ -29,6 +29,7 @@ public class RecordBuffer extends PartitionBuffer<String> {
     private static final Logger LOG = LoggerFactory.getLogger(RecordBuffer.class);
     public static final String LINE_SEPARATOR = "\n";
     private final StringJoiner buffer;
+    private String label;
 
     public RecordBuffer() {
         super();
@@ -51,5 +52,13 @@ public class RecordBuffer extends PartitionBuffer<String> {
                 getFirstOffset(),
                 getLastOffset());
         return result;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
     }
 }

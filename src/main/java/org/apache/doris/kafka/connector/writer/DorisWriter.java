@@ -42,7 +42,7 @@ public abstract class DorisWriter {
     protected String dbName;
     protected final String tableIdentifier;
     protected List<String> fileNames;
-    private RecordBuffer buffer;
+    protected RecordBuffer buffer;
     protected final AtomicLong committedOffset; // loaded offset + 1
     protected final AtomicLong flushedOffset; // flushed offset
     protected final AtomicLong processedOffset; // processed offset
@@ -116,11 +116,8 @@ public abstract class DorisWriter {
 
     protected void insertRecord(final SinkRecord record) {
         // discard the record if the record offset is smaller or equal to server side offset
-        // when enable.combine.flush=true, No verification is required because the offsets of
-        // multiple partitions cannot be compared.
-        if (dorisOptions.isEnableCombineFlush()
-                || (record.kafkaOffset() > this.offsetPersistedInDoris.get()
-                        && record.kafkaOffset() > processedOffset.get())) {
+        if (record.kafkaOffset() > this.offsetPersistedInDoris.get()
+                && record.kafkaOffset() > processedOffset.get()) {
             SinkRecord dorisRecord = record;
             RecordBuffer tmpBuff = null;
 
@@ -173,6 +170,11 @@ public abstract class DorisWriter {
     public boolean shouldFlush() {
         return (System.currentTimeMillis() - this.previousFlushTimeStamp)
                 >= (dorisOptions.getFlushTime() * 1000);
+    }
+
+    // for combine flush
+    public void commitFlush() {
+        flushBuffer();
     }
 
     public void flushBuffer() {
