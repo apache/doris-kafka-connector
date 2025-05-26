@@ -141,7 +141,7 @@ public abstract class DorisWriter {
             }
             processedOffset.set(dorisRecord.kafkaOffset());
         } else {
-            LOG.warn(
+            LOG.debug(
                     "The record offset is smaller than processedOffset. recordOffset={}, offsetPersistedInDoris={}, processedOffset={}",
                     record.kafkaOffset(),
                     offsetPersistedInDoris.get(),
