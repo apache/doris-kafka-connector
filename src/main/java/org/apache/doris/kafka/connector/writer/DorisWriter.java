@@ -138,11 +138,13 @@ public abstract class DorisWriter {
             }
             processedOffset.set(dorisRecord.kafkaOffset());
         } else {
-            LOG.warn(
-                    "The record offset is smaller than processedOffset. recordOffset={}, offsetPersistedInDoris={}, processedOffset={}",
-                    record.kafkaOffset(),
-                    offsetPersistedInDoris.get(),
-                    processedOffset.get());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(
+                        "The record offset is smaller than processedOffset. recordOffset={}, offsetPersistedInDoris={}, processedOffset={}",
+                        record.kafkaOffset(),
+                        offsetPersistedInDoris.get(),
+                        processedOffset.get());
+            }
         }
     }
 
