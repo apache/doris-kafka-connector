@@ -326,6 +326,24 @@ public class TestRecordService {
                 new ObjectMapper().writeValueAsString(objectNode));
     }
 
+    @Test
+    public void testFeResponseToSchemaNotMap() throws Exception {
+        String schemaStr =
+                "{\"keysType_notExist\":\"UNIQUE_KEYS\",\"properties\":[{\"name\":\"id\", \"noExistField\":\"test\", \"aggregation_type\":\"\",\"comment\":\"\",\"type\":\"BIGINT\"},{\"name\":\"name\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"age\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"INT\"},{\"name\":\"email\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"birth_date\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATEV2\"},{\"name\":\"integer_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"INT\"},{\"name\":\"float_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"FLOAT\"},{\"name\":\"decimal_column\",\"aggregation_type\":\"NONE\",\"scale\":\"2\",\"comment\":\"\",\"type\":\"DECIMAL64\",\"precision\":\"10\"},{\"name\":\"datetime_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATETIMEV2\"},{\"name\":\"date_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"DATEV2\"},{\"name\":\"text_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"binary_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"is_active\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"BOOLEAN\"},{\"name\":\"varchar_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"VARCHAR\"},{\"name\":\"blob_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"STRING\"},{\"name\":\"time_column\",\"aggregation_type\":\"NONE\",\"comment\":\"\",\"type\":\"STRING\"}],\"status\":200}";
+        Schema schema = null;
+        try {
+            schema = objectMapper.readValue(schemaStr, Schema.class);
+        } catch (JsonProcessingException e) {
+            throw new DorisException(e);
+        }
+        mockRestService
+                .when(() -> RestService.getSchema(any(), any(), any(), any()))
+                .thenReturn(schema);
+
+        Assert.assertNull(schema.getKeysType());
+        Assert.assertEquals(16, schema.getProperties().size());
+    }
+
     @After
     public void close() {
         mockRestService.close();
