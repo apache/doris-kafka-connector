@@ -19,10 +19,12 @@
 
 package org.apache.doris.kafka.connector.model.doris;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Schema {
     private int status = 0;
     private String keysType;

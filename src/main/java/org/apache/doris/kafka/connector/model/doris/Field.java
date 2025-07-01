@@ -19,9 +19,11 @@
 
 package org.apache.doris.kafka.connector.model.doris;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Field {
     @JsonProperty(value = "name")
     private String name;
