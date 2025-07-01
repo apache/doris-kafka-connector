@@ -135,8 +135,8 @@ public abstract class DorisWriter {
                         tmpBuff.getBufferSizeBytes(),
                         tmpBuff.getNumOfRecords());
                 flush(tmpBuff);
+                processedOffset.set(dorisRecord.kafkaOffset());
             }
-            processedOffset.set(dorisRecord.kafkaOffset());
         } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug(
