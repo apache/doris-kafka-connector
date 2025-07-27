@@ -83,8 +83,8 @@ public class ConfigCheckUtils {
             configIsValid = false;
         }
 
-        if (config.containsKey(DorisSinkConnectorConfig.TOPICS_TABLES_MAP)
-                && parseTopicToTableMap(config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP))
+        if (!config.containsKey(DorisSinkConnectorConfig.TOPICS_TABLES_MAP)
+                || parseTopicToTableMap(config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP))
                         == null) {
             LOG.error("{} is empty or invalid.", DorisSinkConnectorConfig.TOPICS_TABLES_MAP);
             configIsValid = false;
