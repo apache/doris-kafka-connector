@@ -22,7 +22,7 @@ under the License.
 [Kafka Connect](https://docs.confluent.io/platform/current/connect/index.html) is a scalable and reliable tool for data transmission between Apache Kafka and other systems. Connectors can be defined Move large amounts of data in and out of Kafka.
 
 Doris provides the Sink Connector plug-in, which can write data from Kafka topics to Doris.
-More information about usage, please visit [Doris Kafka Connector](https://doris.apache.org/docs/dev/ecosystem/doris-kafka-connector)
+More information about usage, please visit [Doris Kafka Connector](https://doris.apache.org/docs/ecosystem/doris-kafka-connector)
 
 ## License
 
