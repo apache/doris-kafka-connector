@@ -289,6 +289,9 @@ public class ConfigCheckUtils {
     }
 
     public static Map<String, String> parseTopicToTableMap(String input) {
+        if (input == null) {
+            return null;
+        }
         Map<String, String> topic2Table = new HashMap<>();
         boolean isInvalid = false;
         for (String str : input.split(",")) {
