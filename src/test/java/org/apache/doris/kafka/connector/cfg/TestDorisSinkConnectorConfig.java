@@ -45,6 +45,7 @@ public class TestDorisSinkConnectorConfig {
         config.put(DorisSinkConnectorConfig.DORIS_PASSWORD, "password");
 
         config.put(DorisSinkConnectorConfig.DORIS_DATABASE, "testDatabase");
+        config.put(DorisSinkConnectorConfig.TOPICS_TABLES_MAP, "topic1:table1,topic2:table2");
         config.put(
                 DorisSinkConnectorConfig.BUFFER_COUNT_RECORDS,
                 DorisSinkConnectorConfig.BUFFER_COUNT_RECORDS_DEFAULT + "");
@@ -61,6 +62,13 @@ public class TestDorisSinkConnectorConfig {
     @Test
     public void testConfig() {
         Map<String, String> config = getConfig();
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test(expected = DorisException.class)
+    public void testEmptyTopic2MapConfig() {
+        Map<String, String> config = getConfig();
+        config.remove(DorisSinkConnectorConfig.TOPICS_TABLES_MAP);
         ConfigCheckUtils.validateConfig(config);
     }
 

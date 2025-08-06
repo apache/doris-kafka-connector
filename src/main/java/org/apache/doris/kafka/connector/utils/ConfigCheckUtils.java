@@ -83,8 +83,8 @@ public class ConfigCheckUtils {
             configIsValid = false;
         }
 
-        if (config.containsKey(DorisSinkConnectorConfig.TOPICS_TABLES_MAP)
-                && parseTopicToTableMap(config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP))
+        if (!config.containsKey(DorisSinkConnectorConfig.TOPICS_TABLES_MAP)
+                || parseTopicToTableMap(config.get(DorisSinkConnectorConfig.TOPICS_TABLES_MAP))
                         == null) {
             LOG.error("{} is empty or invalid.", DorisSinkConnectorConfig.TOPICS_TABLES_MAP);
             configIsValid = false;
@@ -289,6 +289,9 @@ public class ConfigCheckUtils {
     }
 
     public static Map<String, String> parseTopicToTableMap(String input) {
+        if (input == null) {
+            return null;
+        }
         Map<String, String> topic2Table = new HashMap<>();
         boolean isInvalid = false;
         for (String str : input.split(",")) {
