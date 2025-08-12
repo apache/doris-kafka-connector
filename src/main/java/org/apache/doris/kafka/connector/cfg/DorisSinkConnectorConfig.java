@@ -294,6 +294,16 @@ public class DorisSinkConnectorConfig {
                         7,
                         ConfigDef.Width.NONE,
                         RECORD_TABLE_NAME_FIELD)
+                .define(
+                        BEHAVIOR_ON_NULL_VALUES,
+                        Type.STRING,
+                        BEHAVIOR_ON_NULL_VALUES_DEFAULT,
+                        Importance.LOW,
+                        "Used to handle records with a null value.",
+                        CONNECTOR_CONFIG,
+                        8,
+                        ConfigDef.Width.NONE,
+                        BEHAVIOR_ON_NULL_VALUES)
                 // debezium config
                 .define(
                         CONVERTER_MODE,
@@ -338,16 +348,6 @@ public class DorisSinkConnectorConfig {
                         2,
                         ConfigDef.Width.NONE,
                         RETRY_INTERVAL_MS)
-                .define(
-                        BEHAVIOR_ON_NULL_VALUES,
-                        Type.STRING,
-                        BEHAVIOR_ON_NULL_VALUES_DEFAULT,
-                        Importance.LOW,
-                        "Used to handle records with a null value.",
-                        CONNECTOR_CONFIG,
-                        18,
-                        ConfigDef.Width.NONE,
-                        BEHAVIOR_ON_NULL_VALUES)
                 .define(
                         JMX_OPT,
                         ConfigDef.Type.BOOLEAN,
