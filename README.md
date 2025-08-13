@@ -21,7 +21,7 @@ under the License.
 
 [Kafka Connect](https://docs.confluent.io/platform/current/connect/index.html) is a scalable and reliable tool for data transmission between Apache Kafka and other systems. Connectors can be defined Move large amounts of data in and out of Kafka.
 
-Doris provides the Sink Connector plug-in, which can write data from Kafka topics to Doris.
+Doris provides the Sink Connector plugin, which can write data from Kafka topics to Doris.
 More information about usage, please visit [Doris Kafka Connector](https://doris.apache.org/docs/ecosystem/doris-kafka-connector)
 
 ## License
@@ -34,6 +34,7 @@ After running the following command, the jar package of Doris-Kafka-Connector wi
 ```
 sh build.sh
 ```
+Note: Confluent archive zip file can be packaged through `sh build.sh --confluent`
 
 ## Code formatting
 Doris-Kafka-Connector uses the AOSP style in google-java-format version 1.7 as the formatting style of the project code.
@@ -44,3 +45,6 @@ When you need to format your code, you have two formatting options:
 - Execute `mvn spotless:apply` under the project
 
 After executing the above formatting command, you can use `mvn spotless:check` to check whether the code format meets the requirements.
+
+## Help
+For additional help, please [file an issue in the repository](https://github.com/apache/doris-kafka-connector/issues) or raise a question in [Apache Doris Public Slack](https://apachedoriscommunity.slack.com/).

@@ -1,0 +1,59 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<assembly>
+    <id>confluent</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>true</includeBaseDirectory>
+
+    <fileSets>
+        <!-- manifest.json -->
+        <fileSet>
+            <directory>${project.build.directory}/filtered-resources</directory>
+            <includes>
+                <include>manifest.json</include>
+            </includes>
+            <outputDirectory>/</outputDirectory>
+        </fileSet>
+
+        <!-- assets -->
+        <fileSet>
+            <directory>${basedir}/config/archive/assets</directory>
+            <outputDirectory>assets</outputDirectory>
+        </fileSet>
+
+        <!-- doc -->
+        <fileSet>
+            <directory>${basedir}</directory>
+            <includes>
+                <include>README.md</include>
+                <include>LICENSE</include>
+            </includes>
+            <outputDirectory>doc</outputDirectory>
+        </fileSet>
+
+        <!-- lib -->
+        <fileSet>
+            <directory>${project.build.directory}</directory>
+            <includes>
+                <include>doris-kafka-connector-${revision}.jar</include>
+            </includes>
+            <outputDirectory>lib</outputDirectory>
+        </fileSet>
+    </fileSets>
+</assembly>
