@@ -24,6 +24,7 @@ header:
   paths-ignore:
     - 'LICENSE'
     - '.gitignore'
+    - 'config/archive/**'
     - 'src/test/resources/decode/avro/**'
     - 'src/test/resources/e2e/**'
 
