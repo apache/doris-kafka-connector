@@ -92,8 +92,8 @@ public class AsyncDorisStreamLoad extends DataLoad {
                         new DefaultThreadFactory("streamload-executor"),
                         new ThreadPoolExecutor.AbortPolicy());
 
-        start();
         this.started = new AtomicBoolean(true);
+        start();
     }
 
     public void start() {
