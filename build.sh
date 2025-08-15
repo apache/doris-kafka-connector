@@ -61,6 +61,6 @@ if ls target/doris-kafka-connector-*.jar >/dev/null 2>&1; then
 fi
 
 # Copy Confluent ZIP if present
-if ls target/doris-kafka-connector-*.zip >/dev/null 2>&1; then
-  cp -r target/doris-kafka-connector-*.zip dist
+if ls target/*doris-kafka-connector-*.zip >/dev/null 2>&1; then
+  cp -r target/*doris-kafka-connector-*.zip dist
 fi

@@ -17,10 +17,10 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Monitor Doris Kafka Connector using Java Management Extensions (JMX)
-This article describes how to monitor the Doris Kafka Connector using Java Management Extensions (JMX). 
+# Monitor VeloDB Kafka Connector using Java Management Extensions (JMX)
+This article describes how to monitor the VeloDB Kafka Connector using Java Management Extensions (JMX). 
 
-Kafka Connect provides some default JMX Metrics, and Doris Kafka Connector also extends these Metrics to obtain more monitoring indicators.
+Kafka Connect provides some default JMX Metrics, and VeloDB Kafka Connector also extends these Metrics to obtain more monitoring indicators.
 You can also import these indicators into third-party monitoring tools, including (Prometheus, Grafana).
 
 
@@ -46,7 +46,7 @@ The JMX Metrics function is enabled by default. If you need to disable this func
      ````
 2. Restart Kafka Connect
 
-## Use Doris Kafka Connector to manage Beans (MBeans)
+## Use VeloDB Kafka Connector to manage Beans (MBeans)
 Kafka Connector Doris provides MBeans for accessing management objects. Through these MBeans indicators, you can clearly understand the internal status of the connector.
 
 The general format of Kafka Connector MBean object names is:

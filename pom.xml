@@ -403,7 +403,7 @@
                     <artifactId>maven-assembly-plugin</artifactId>
                     <version>3.3.0</version>
                     <configuration>
-                        <finalName>${project.artifactId}-${project.version}</finalName>
+                        <finalName>velodb-${project.artifactId}-${project.version}</finalName>
                         <appendAssemblyId>false</appendAssemblyId>
                         <descriptors>
                             <descriptor>src/assembly/confluent.xml</descriptor>
