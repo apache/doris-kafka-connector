@@ -137,8 +137,6 @@ public class SchemaCreationManager {
         }
 
         dmlBuilder.append(";");
-        RestService.createTable(
-                dorisOptions, dorisOptions.getDatabase(), tableName, dmlBuilder.toString(), LOG);
 
         return dmlBuilder.toString();
     }
