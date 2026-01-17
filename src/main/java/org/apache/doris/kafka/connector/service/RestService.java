@@ -31,6 +31,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,6 +54,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
@@ -62,6 +64,7 @@ public class RestService {
 
     private static final String BACKENDS_V2 = "/api/backends?is_alive=true";
     private static final String TABLE_SCHEMA_API = "http://%s/api/%s/%s/_schema";
+    private static final String QUERY_STATEMENT_API = "http://%s/api/query/internal/%s";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String UNIQUE_KEYS_TYPE = "UNIQUE_KEYS";
 
@@ -325,6 +328,42 @@ public class RestService {
             return OBJECT_MAPPER.readValue(schemaStr, Schema.class);
         } catch (JsonProcessingException | IllegalArgumentException e) {
             throw new SchemaChangeException("can not parse response schema " + responseData, e);
+        }
+    }
+
+    public static void createTable(
+            DorisOptions dorisOptions, String db, String table, String stmt, Logger logger) {
+        logger.trace("start create {}.{} table to doris.", db, table);
+        Object responseData = null;
+        try {
+            String tableSchemaUri =
+                    String.format(QUERY_STATEMENT_API, dorisOptions.getHttpUrl(), db);
+            HttpPost httpPost = new HttpPost(tableSchemaUri);
+            httpPost.setHeader(HttpHeaders.AUTHORIZATION, authHeader(dorisOptions));
+
+            Map<String, Object> payloadMap = new HashMap<>();
+
+            payloadMap.put("stmt", stmt);
+
+            String payloadJsonString = OBJECT_MAPPER.writeValueAsString(payloadMap);
+
+            StringEntity entity = new StringEntity(payloadJsonString, "UTF-8");
+
+            entity.setContentType("application/json");
+            httpPost.setEntity(entity);
+            httpPost.setHeader("Accept", "application/json");
+
+            Map<String, Object> responseMap = handleResponse(httpPost, logger);
+            responseData = responseMap.get("msg");
+            if (!"success".equalsIgnoreCase(responseData.toString())) {
+                String errMsg = "Fail to create table via Doris FE. res: " + responseMap.toString();
+                logger.error(errMsg);
+                throw new DorisException(errMsg);
+            }
+        } catch (Exception e) {
+            String errMsg = "SchemaCreation request error," + e;
+            logger.warn(errMsg);
+            throw new SchemaChangeException("SchemaCreation request error with " + e.getMessage());
         }
     }
 

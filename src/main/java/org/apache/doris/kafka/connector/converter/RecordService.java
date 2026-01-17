@@ -37,6 +37,7 @@ import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.converter.schema.SchemaChangeManager;
+import org.apache.doris.kafka.connector.converter.schema.SchemaCreationManager;
 import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
 import org.apache.doris.kafka.connector.converter.type.Type;
 import org.apache.doris.kafka.connector.exception.DataFormatException;
@@ -65,6 +66,7 @@ public class RecordService {
     private final JsonConverter converter;
     private DorisSystemService dorisSystemService;
     private SchemaChangeManager schemaChangeManager;
+    private SchemaCreationManager schemaCreationManager;
     private DorisOptions dorisOptions;
     private RecordTypeRegister recordTypeRegister;
     private Set<RecordDescriptor.FieldDescriptor> missingFields;
@@ -85,6 +87,7 @@ public class RecordService {
         this.recordTypeRegister = new RecordTypeRegister(dorisOptions);
         this.dorisSystemService = new DorisSystemService(dorisOptions);
         this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
+        this.schemaCreationManager = new SchemaCreationManager(dorisOptions);
         this.dorisTableDescriptorCache = new HashMap<>();
     }
 
@@ -145,14 +148,9 @@ public class RecordService {
     private void checkAndApplyTableChangesIfNeeded(
             String tableName, RecordDescriptor recordDescriptor) {
         if (!hasTable(tableName)) {
-            // TODO Table does not exist, lets attempt to create it.
-            LOG.warn("The {} table does not exist, please create it manually.", tableName);
-            throw new DorisException(
-                    "The " + tableName + " table does not exist, please create it manually.");
-        } else {
-            // Table exists, lets attempt to alter it if necessary.
-            alterTableIfNeeded(tableName, recordDescriptor);
+            schemaCreationManager.createTable(tableName, recordDescriptor);
         }
+        alterTableIfNeeded(tableName, recordDescriptor);
     }
 
     private boolean hasTable(String tableName) {

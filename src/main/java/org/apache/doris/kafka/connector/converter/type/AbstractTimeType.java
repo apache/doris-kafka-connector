@@ -41,7 +41,9 @@ public abstract class AbstractTimeType extends AbstractTemporalType {
     }
 
     protected int getTimePrecision(Schema schema) {
-        final String length = getSourceColumnLength(schema).orElse("0");
+        // TODO: Is it better to create a new child class in every class that implements abstract
+        // timestamp class to override the precision?
+        final String length = getSourceColumnLength(schema).orElse("6");
         final Optional<String> scale = getSourceColumnPrecision(schema);
         return scale.map(Integer::parseInt).orElseGet(() -> Integer.parseInt(length));
     }
