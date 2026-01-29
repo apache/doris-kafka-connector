@@ -155,7 +155,7 @@ public class TestRecordService {
 
         // Compare the results of schema change
         Map<String, String> resultFields = new HashMap<>();
-        resultFields.put("time_column", "DATETIME(0)");
+        resultFields.put("time_column", "DATETIME(6)");
         resultFields.put("blob_column", "STRING");
         Set<RecordDescriptor.FieldDescriptor> missingFields = recordService.getMissingFields();
         for (RecordDescriptor.FieldDescriptor missingField : missingFields) {
