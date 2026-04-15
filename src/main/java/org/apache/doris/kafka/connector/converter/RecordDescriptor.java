@@ -19,12 +19,11 @@
 package org.apache.doris.kafka.connector.converter;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.doris.kafka.connector.converter.type.Type;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
@@ -35,7 +34,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
 public class RecordDescriptor {
     private final SinkRecord record;
     private final String topicName;
-    private final Set<String> keyFieldNames;
+    private final LinkedHashSet<String> keyFieldNames;
     private final List<String> nonKeyFieldNames;
     private final Map<String, FieldDescriptor> fields;
     private final boolean flattened;
@@ -49,7 +48,7 @@ public class RecordDescriptor {
         this.record = record;
         this.topicName = topicName;
         this.nonKeyFieldNames = nonKeyFieldNames;
-        this.keyFieldNames = new HashSet<String>();
+        this.keyFieldNames = new LinkedHashSet<String>();
         this.fields = fields;
         this.flattened = flattened;
     }
@@ -58,7 +57,7 @@ public class RecordDescriptor {
             SinkRecord record,
             String topicName,
             List<String> nonKeyFieldNames,
-            Set<String> keyFieldNames,
+            LinkedHashSet<String> keyFieldNames,
             Map<String, FieldDescriptor> fields,
             boolean flattened) {
         this.record = record;
@@ -81,7 +80,7 @@ public class RecordDescriptor {
         return record.kafkaOffset();
     }
 
-    public Set<String> getKeyFieldNames() {
+    public LinkedHashSet<String> getKeyFieldNames() {
         return keyFieldNames;
     }
 
@@ -184,7 +183,7 @@ public class RecordDescriptor {
         private Map<String, Type> typeRegistry;
 
         // Internal build state
-        private final Set<String> keyFieldNames = new HashSet<>();
+        private final LinkedHashSet<String> keyFieldNames = new LinkedHashSet<>();
         private final List<String> nonKeyFieldNames = new ArrayList<>();
         private final Map<String, FieldDescriptor> allFields = new LinkedHashMap<>();
 
@@ -221,12 +220,19 @@ public class RecordDescriptor {
         }
 
         private boolean isFlattened(SinkRecord record) {
-            return record.valueSchema().name() == null
-                    || !record.valueSchema().name().contains("Envelope");
+            final Schema valueSchema = record.valueSchema();
+            if (valueSchema == null || valueSchema.name() == null) {
+                return true;
+            }
+            return !record.valueSchema().name().contains("Envelope");
         }
 
         private boolean keyIsFlattened(SinkRecord record) {
-            return record.keySchema().name() == null || !record.keySchema().name().contains("Key");
+            final Schema keySchema = record.keySchema();
+            if (keySchema == null || keySchema.name() == null) {
+                return true;
+            }
+            return !keySchema.name().contains("Key");
         }
 
         private boolean isTombstone(SinkRecord record) {
@@ -260,7 +266,7 @@ public class RecordDescriptor {
             final Schema keySchema = record.keySchema();
             if (keySchema != null) {
                 if (!flattened) {
-                    applyKeyFields(keySchema.schema());
+                    applyKeyFields(keySchema);
                 }
             }
         }
@@ -278,7 +284,6 @@ public class RecordDescriptor {
         }
 
         private void applyKeyFields(Schema schema) {
-            System.out.println(schema.toString());
             for (Field field : schema.fields()) {
                 keyFieldNames.add(field.name());
             }

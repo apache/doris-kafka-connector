@@ -19,8 +19,6 @@
 
 package org.apache.doris.kafka.connector.converter.schema;
 
-import static org.mockito.Mockito.mockStatic;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +29,6 @@ import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.converter.RecordDescriptor;
 import org.apache.doris.kafka.connector.converter.RecordTypeRegister;
-import org.apache.doris.kafka.connector.service.RestService;
 import org.apache.doris.kafka.connector.writer.TestRecordBuffer;
 import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.json.JsonConverter;
@@ -40,7 +37,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.MockedStatic;
 
 public class TestSchemaCreationManager {
 
@@ -48,16 +44,20 @@ public class TestSchemaCreationManager {
     private SchemaCreationManager schemaCreationManager;
     private RecordTypeRegister recordTypeRegister;
     private Properties props = new Properties();
-    private MockedStatic<RestService> mockRestService;
+    private String database = "default_cluster";
+    // private MockedStatic<RestService> mockRestService;
 
     @Before
     public void init() throws IOException {
-        InputStream stream =
+        try (InputStream stream =
                 this.getClass()
                         .getClassLoader()
-                        .getResourceAsStream("doris-connector-sink.properties");
-        props.load(stream);
+                        .getResourceAsStream("doris-connector-sink.properties")) {
+            Assert.assertNotNull("doris-connector-sink.properties not found on classpath", stream);
+            props.load(stream);
+        }
         DorisSinkConnectorConfig.setDefaultValues((Map) props);
+        props.put("doris.database", "default_cluster");
         props.put("task_id", "1");
         props.put("converter.mode", "debezium_ingestion");
         props.put("debezium.schema.evolution", "basic");
@@ -69,12 +69,12 @@ public class TestSchemaCreationManager {
         recordTypeRegister = new RecordTypeRegister(new DorisOptions((Map) props));
         HashMap<String, String> config = new HashMap<>();
         jsonConverter.configure(config, false);
-        mockRestService = mockStatic(RestService.class);
+        // mockRestService = mockStatic(RestService.class);
     }
 
     @After
     public void close() {
-        mockRestService.close();
+        // mockRestService.close();
     }
 
     @Test
@@ -113,10 +113,10 @@ public class TestSchemaCreationManager {
                         .build();
 
         String expectedDDL =
-                "CREATE TABLE IF NOT EXISTS psql_composite_table (course_code VARCHAR(65533) NOT NULL, student_id INT NOT NULL, grade INT NULL) ENGINE=OLAP UNIQUE KEY (course_code, student_id) DISTRIBUTED BY HASH (course_code, student_id) BUCKETS AUTO;";
+                "CREATE TABLE IF NOT EXISTS `default_cluster`.`psql_composite_table` (`student_id` INT NOT NULL, `course_code` VARCHAR(65533) NOT NULL, `grade` INT NULL) ENGINE=OLAP UNIQUE KEY (`student_id`, `course_code`) DISTRIBUTED BY HASH (`student_id`, `course_code`) BUCKETS AUTO PROPERTIES (\"replication_num\" = \"3\");";
 
         String ddlCreateTable =
-                schemaCreationManager.buildCreateTableDDL(psqlDbzTable, recordDescriptor);
+                schemaCreationManager.buildCreateTableDDL(database, psqlDbzTable, recordDescriptor);
 
         Assert.assertEquals(expectedDDL, ddlCreateTable);
     }
@@ -157,10 +157,10 @@ public class TestSchemaCreationManager {
                         .build();
 
         String expectedDDL =
-                "CREATE TABLE IF NOT EXISTS psql_common_table (id INT NOT NULL, col_smallint SMALLINT NULL, col_integer INT NULL, col_bigint BIGINT NULL, col_numeric DECIMAL(10,2) NULL, col_real FLOAT NULL, col_double DOUBLE NULL, col_money DECIMAL(38,2) NULL, col_varchar STRING NULL, col_text STRING NULL, col_timestamp DATETIME(6) NULL, col_timestamptz DATETIME(6) NULL, col_date DATE NULL, col_time VARCHAR(255) NULL, col_interval BIGINT NULL, col_boolean BOOLEAN NULL, col_uuid STRING NULL, col_json JSON NULL, col_jsonb JSON NULL, col_bytea STRING NULL, col_int_array ARRAY<INT> NULL, col_text_array ARRAY<STRING> NULL) ENGINE=OLAP UNIQUE KEY (id) DISTRIBUTED BY HASH (id) BUCKETS AUTO;";
+                "CREATE TABLE IF NOT EXISTS `default_cluster`.`psql_common_table` (`id` INT NOT NULL, `col_smallint` SMALLINT NULL, `col_integer` INT NULL, `col_bigint` BIGINT NULL, `col_numeric` DECIMAL(10,2) NULL, `col_real` FLOAT NULL, `col_double` DOUBLE NULL, `col_money` DECIMAL(38,2) NULL, `col_varchar` STRING NULL, `col_text` STRING NULL, `col_timestamp` DATETIME(6) NULL, `col_timestamptz` DATETIME(6) NULL, `col_date` DATE NULL, `col_time` DATETIME(6) NULL, `col_interval` BIGINT NULL, `col_boolean` BOOLEAN NULL, `col_uuid` STRING NULL, `col_json` JSON NULL, `col_jsonb` JSON NULL, `col_bytea` STRING NULL, `col_int_array` ARRAY<INT> NULL, `col_text_array` ARRAY<STRING> NULL) ENGINE=OLAP UNIQUE KEY (`id`) DISTRIBUTED BY HASH (`id`) BUCKETS AUTO PROPERTIES (\"replication_num\" = \"3\");";
 
         String ddlCreateTable =
-                schemaCreationManager.buildCreateTableDDL(psqlDbzTable, recordDescriptor);
+                schemaCreationManager.buildCreateTableDDL(database, psqlDbzTable, recordDescriptor);
 
         Assert.assertEquals(expectedDDL, ddlCreateTable);
     }
@@ -206,10 +206,11 @@ public class TestSchemaCreationManager {
                         .build();
 
         String expectedDDL =
-                "CREATE TABLE IF NOT EXISTS mysql_common_table (id INT NOT NULL, name STRING NULL, age INT NULL, email STRING NULL, birth_date DATE NULL, integer_column INT NULL, float_column FLOAT NULL, decimal_column DECIMAL(10,2) NULL, datetime_column DATETIME(6) NULL, date_column DATE NULL, time_column VARCHAR(255) NULL, text_column STRING NULL, varchar_column STRING NULL, binary_column STRING NULL, blob_column STRING NULL, is_active SMALLINT NULL) ENGINE=OLAP UNIQUE KEY (id) DISTRIBUTED BY HASH (id) BUCKETS AUTO;";
+                "CREATE TABLE IF NOT EXISTS `default_cluster`.`mysql_common_table` (`id` INT NOT NULL, `name` STRING NULL, `age` INT NULL, `email` STRING NULL, `birth_date` DATE NULL, `integer_column` INT NULL, `float_column` FLOAT NULL, `decimal_column` DECIMAL(10,2) NULL, `datetime_column` DATETIME(6) NULL, `date_column` DATE NULL, `time_column` DATETIME(6) NULL, `text_column` STRING NULL, `varchar_column` STRING NULL, `binary_column` STRING NULL, `blob_column` STRING NULL, `is_active` SMALLINT NULL) ENGINE=OLAP UNIQUE KEY (`id`) DISTRIBUTED BY HASH (`id`) BUCKETS AUTO PROPERTIES (\"replication_num\" = \"3\");";
 
         String ddlCreateTable =
-                schemaCreationManager.buildCreateTableDDL(mysqlDbzTable, recordDescriptor);
+                schemaCreationManager.buildCreateTableDDL(
+                        database, mysqlDbzTable, recordDescriptor);
 
         Assert.assertEquals(expectedDDL, ddlCreateTable);
     }
@@ -254,10 +255,11 @@ public class TestSchemaCreationManager {
                         .build();
 
         String expectedDDL =
-                "CREATE TABLE IF NOT EXISTS mysql_geo_table (id INT NOT NULL, geo_point STRING NULL, geo_linestring STRING NULL, geo_polygon STRING NULL, geo_multipoint STRING NULL, geo_multilinestring STRING NULL, geo_multipolygon STRING NULL, geo_geometry STRING NULL, geo_geometrycollection STRING NULL) ENGINE=OLAP UNIQUE KEY (id) DISTRIBUTED BY HASH (id) BUCKETS AUTO;";
+                "CREATE TABLE IF NOT EXISTS `default_cluster`.`mysql_geo_table` (`id` INT NOT NULL, `geo_point` STRING NULL, `geo_linestring` STRING NULL, `geo_polygon` STRING NULL, `geo_multipoint` STRING NULL, `geo_multilinestring` STRING NULL, `geo_multipolygon` STRING NULL, `geo_geometry` STRING NULL, `geo_geometrycollection` STRING NULL) ENGINE=OLAP UNIQUE KEY (`id`) DISTRIBUTED BY HASH (`id`) BUCKETS AUTO PROPERTIES (\"replication_num\" = \"3\");";
 
         String ddlCreateTable =
-                schemaCreationManager.buildCreateTableDDL(mysqlDbzTable, recordDescriptor);
+                schemaCreationManager.buildCreateTableDDL(
+                        database, mysqlDbzTable, recordDescriptor);
 
         Assert.assertEquals(expectedDDL, ddlCreateTable);
     }

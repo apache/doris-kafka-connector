@@ -87,6 +87,9 @@ public class DorisSinkConnectorConfig {
     public static final String CONVERTER_MODE = "converter.mode";
     public static final String CONVERT_MODE_DEFAULT = ConverterMode.NORMAL.getName();
 
+    // Prefix for Doris table config specific properties.
+    public static final String TABLE_CONFIG_PROP_PREFIX = "table.conf.";
+
     // Prefix for Doris StreamLoad specific properties.
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
     public static final String DEBEZIUM_CONFIG = "Debezium Config";
