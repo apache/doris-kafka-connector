@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.doris.kafka.connector.utils.BackendUtils;
 import org.apache.doris.kafka.connector.writer.load.AsyncDorisStreamLoad;
 import org.apache.doris.kafka.connector.writer.load.DefaultThreadFactory;
@@ -44,8 +45,16 @@ public class AsyncStreamLoadWriter extends DorisWriter {
             int partition,
             DorisOptions dorisOptions,
             ConnectionProvider connectionProvider,
+            DorisSystemService dorisSystemService,
             DorisConnectMonitor connectMonitor) {
-        super(tableName, topic, partition, dorisOptions, connectionProvider, connectMonitor);
+        super(
+                tableName,
+                topic,
+                partition,
+                dorisOptions,
+                connectionProvider,
+                dorisSystemService,
+                connectMonitor);
         this.labelGenerator = new LabelGenerator(topic, partition, tableIdentifier);
         BackendUtils backendUtils = BackendUtils.getInstance(dorisOptions, LOG);
         this.dorisStreamLoad =

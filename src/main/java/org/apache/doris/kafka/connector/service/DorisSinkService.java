@@ -77,4 +77,7 @@ public interface DorisSinkService {
 
     /** commit data to doris. */
     void commit(Map<TopicPartition, OffsetAndMetadata> offsets);
+
+    /** close the service and release resources. */
+    void close();
 }

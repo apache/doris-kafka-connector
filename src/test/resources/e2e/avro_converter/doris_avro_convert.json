@@ -16,6 +16,7 @@
     "doris.database":"avro_convert",
     "key.converter":"org.apache.kafka.connect.storage.StringConverter",
     "value.converter":"org.apache.doris.kafka.connector.decode.avro.DorisAvroConverter",
-    "value.converter.avro.topic2schema.filepath":"avro-user:file:///opt/avro_user.avsc"
+    "value.converter.avro.topic2schema.filepath":"avro-user:file:///opt/avro_user.avsc",
+    "sink.properties.compress_type":""
   }
 }

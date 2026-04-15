@@ -17,6 +17,7 @@
     "load.model":"stream_load",
     "enable.combine.flush":"true",
     "key.converter":"org.apache.kafka.connect.storage.StringConverter",
-    "value.converter":"org.apache.kafka.connect.storage.StringConverter"
+    "value.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "sink.properties.compress_type":""
   }
 }

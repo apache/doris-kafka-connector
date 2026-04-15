@@ -17,6 +17,7 @@
     "converter.mode": "debezium_ingestion",
     "database.time_zone":"Asia/Shanghai",
     "key.converter":"org.apache.kafka.connect.json.JsonConverter",
-    "value.converter":"org.apache.kafka.connect.json.JsonConverter"
+    "value.converter":"org.apache.kafka.connect.json.JsonConverter",
+    "sink.properties.compress_type":""
   }
 }

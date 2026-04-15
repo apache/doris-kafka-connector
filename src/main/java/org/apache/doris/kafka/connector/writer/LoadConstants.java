@@ -30,4 +30,6 @@ public class LoadConstants {
     // since apache doris 2.1.0, support stream load with group commit mode.
     public static final String GROUP_COMMIT = "group_commit";
     public static final String PARTIAL_COLUMNS = "partial_columns";
+    public static final String COMPRESS_TYPE = "compress_type";
+    public static final String COMPRESS_TYPE_GZ = "gz";
 }

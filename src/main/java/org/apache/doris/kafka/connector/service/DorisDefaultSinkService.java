@@ -67,6 +67,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
     protected final ConnectionProvider conn;
     protected final Map<String, DorisWriter> writer;
     protected final DorisOptions dorisOptions;
+    protected final DorisSystemService dorisSystemService;
     protected final MetricsJmxReporter metricsJmxReporter;
     protected final DorisConnectMonitor connectMonitor;
     protected final ObjectMapper objectMapper;
@@ -78,6 +79,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
         this.objectMapper = new ObjectMapper();
         this.writer = new HashMap<>();
         this.conn = new JdbcConnectionProvider(dorisOptions);
+        this.dorisSystemService = new DorisSystemService(dorisOptions);
         MetricRegistry metricRegistry = new MetricRegistry();
         this.metricsJmxReporter = new MetricsJmxReporter(metricRegistry, dorisOptions.getName());
         this.connectMonitor =
@@ -89,6 +91,12 @@ public class DorisDefaultSinkService implements DorisSinkService {
 
     @Override
     public void init() {}
+
+    @Override
+    public void close() {
+        dorisSystemService.close();
+        conn.closeConnection();
+    }
 
     @Override
     public void startTask(TopicPartition topicPartition) {
@@ -115,13 +123,20 @@ public class DorisDefaultSinkService implements DorisSinkService {
             DorisWriter dorisWriter =
                     LoadModel.COPY_INTO.equals(loadModel)
                             ? new CopyIntoWriter(
-                                    tableName, topic, partition, dorisOptions, conn, connectMonitor)
+                                    tableName,
+                                    topic,
+                                    partition,
+                                    dorisOptions,
+                                    conn,
+                                    dorisSystemService,
+                                    connectMonitor)
                             : new StreamLoadWriter(
                                     tableName,
                                     topic,
                                     partition,
                                     dorisOptions,
                                     conn,
+                                    dorisSystemService,
                                     connectMonitor);
             writer.put(writerKey, dorisWriter);
             metricsJmxReporter.start();

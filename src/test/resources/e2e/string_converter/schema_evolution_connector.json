@@ -1,10 +1,10 @@
 {
-  "name":"debezium_dml_event",
+  "name":"schema_evolution_test",
   "config": {
     "connector.class":"org.apache.doris.kafka.connector.DorisSinkConnector",
-    "topics":"debezium_dml_event",
+    "topics":"schema_evolution_test",
     "tasks.max":"1",
-    "doris.topic2table.map": "debezium_dml_event:debezium_dml_event_tab",
+    "doris.topic2table.map": "schema_evolution_test:schema_evolution_tab",
     "buffer.count.records":"1",
     "buffer.flush.time":"10",
     "buffer.size.bytes":"10000000",
@@ -15,10 +15,10 @@
     "doris.query.port":"9030",
     "doris.database":"debezium_ingestion_msg",
     "converter.mode": "debezium_ingestion",
-    "load.model":"stream_load",
-    "delivery.guarantee":"exactly_once",
-    "enable.2pc": "true",
+    "debezium.schema.evolution": "basic",
     "enable.delete": "true",
+    "enable.2pc": "false",
+    "load.model":"stream_load",
     "key.converter":"org.apache.kafka.connect.json.JsonConverter",
     "value.converter":"org.apache.kafka.connect.json.JsonConverter",
     "sink.properties.compress_type":""

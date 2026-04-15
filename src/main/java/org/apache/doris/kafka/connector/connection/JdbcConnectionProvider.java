@@ -46,7 +46,8 @@ public class JdbcConnectionProvider implements ConnectionProvider, Serializable 
     }
 
     @Override
-    public Connection getOrEstablishConnection() throws ClassNotFoundException, SQLException {
+    public synchronized Connection getOrEstablishConnection()
+            throws ClassNotFoundException, SQLException {
         if (connection != null && !connection.isClosed() && connection.isValid(10)) {
             return connection;
         }
@@ -68,7 +69,7 @@ public class JdbcConnectionProvider implements ConnectionProvider, Serializable 
     }
 
     @Override
-    public void closeConnection() {
+    public synchronized void closeConnection() {
         if (connection != null) {
             try {
                 connection.close();

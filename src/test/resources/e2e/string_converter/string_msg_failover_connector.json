@@ -20,6 +20,7 @@
     "max.retries": "10",
     "retry.interval.ms": "5000",
     "key.converter":"org.apache.kafka.connect.storage.StringConverter",
-    "value.converter":"org.apache.kafka.connect.storage.StringConverter"
+    "value.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "sink.properties.compress_type":""
   }
 }

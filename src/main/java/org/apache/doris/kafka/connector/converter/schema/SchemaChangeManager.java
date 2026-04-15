@@ -58,6 +58,11 @@ public class SchemaChangeManager implements Serializable {
         this.dorisSystemService = new DorisSystemService(dorisOptions);
     }
 
+    public SchemaChangeManager(DorisOptions dorisOptions, DorisSystemService dorisSystemService) {
+        this.dorisOptions = dorisOptions;
+        this.dorisSystemService = dorisSystemService;
+    }
+
     private boolean handleSchemaChange(Map<String, Object> responseMap, String responseEntity) {
         String code = responseMap.getOrDefault("code", "-1").toString();
         if (code.equals("0")) {

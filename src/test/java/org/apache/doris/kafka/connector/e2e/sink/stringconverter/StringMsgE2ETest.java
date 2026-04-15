@@ -481,6 +481,43 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
         }
     }
 
+    @Test
+    public void testDebeziumSchemaEvolution() throws Exception {
+        initialize("src/test/resources/e2e/string_converter/schema_evolution_connector.json");
+        String topic = "schema_evolution_test";
+
+        // First message: schema has id, name, age — matches the table
+        String insert1 =
+                "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"}],\"optional\":true,\"name\":\"test.schema_evolution.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"}],\"optional\":true,\"name\":\"test.schema_evolution.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"boolean\",\"optional\":true,\"default\":false,\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"server_id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"gtid\"},{\"type\":\"string\",\"optional\":false,\"field\":\"file\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"pos\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"row\"}],\"optional\":false,\"name\":\"io.debezium.connector.mysql.Source\",\"field\":\"source\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"}],\"optional\":false,\"name\":\"test.schema_evolution.Envelope\"},\"payload\":{\"op\":\"c\",\"ts_ms\":1465491411815,\"before\":null,\"after\":{\"id\":1,\"name\":\"doris\",\"age\":18},\"source\":{\"version\":\"1.9.8.Final\",\"connector\":\"mysql\",\"name\":\"test\",\"ts_ms\":0,\"snapshot\":false,\"db\":\"test\",\"table\":\"schema_evolution\",\"server_id\":0,\"gtid\":null,\"file\":\"mysql-bin.000001\",\"pos\":154,\"row\":0}}}";
+
+        String tableSql =
+                loadContent("src/test/resources/e2e/string_converter/schema_evolution_tab.sql");
+        createTable(tableSql);
+        Thread.sleep(2000);
+        kafkaContainerService.registerKafkaConnector(connectorName, jsonMsgConnectorContent);
+        produceMsg2Kafka(topic, insert1);
+
+        String table = dorisOptions.getTopicMapTable(topic);
+        List<String> expected1 = Arrays.asList("1,doris,18");
+        Thread.sleep(20000);
+        String query = String.format("select id,name,age from %s.%s order by id", database, table);
+        checkResult(expected1, query, 3);
+
+        // Second message: schema adds a new column 'new_col' — should trigger schema evolution
+        String insert2 =
+                "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"},{\"type\":\"string\",\"optional\":true,\"field\":\"new_col\"}],\"optional\":true,\"name\":\"test.schema_evolution.Value\",\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"int32\",\"optional\":false,\"field\":\"id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"name\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"age\"},{\"type\":\"string\",\"optional\":true,\"field\":\"new_col\"}],\"optional\":true,\"name\":\"test.schema_evolution.Value\",\"field\":\"after\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"string\",\"optional\":false,\"field\":\"version\"},{\"type\":\"string\",\"optional\":false,\"field\":\"connector\"},{\"type\":\"string\",\"optional\":false,\"field\":\"name\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"ts_ms\"},{\"type\":\"boolean\",\"optional\":true,\"default\":false,\"field\":\"snapshot\"},{\"type\":\"string\",\"optional\":false,\"field\":\"db\"},{\"type\":\"string\",\"optional\":true,\"field\":\"table\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"server_id\"},{\"type\":\"string\",\"optional\":true,\"field\":\"gtid\"},{\"type\":\"string\",\"optional\":false,\"field\":\"file\"},{\"type\":\"int64\",\"optional\":false,\"field\":\"pos\"},{\"type\":\"int32\",\"optional\":false,\"field\":\"row\"}],\"optional\":false,\"name\":\"io.debezium.connector.mysql.Source\",\"field\":\"source\"},{\"type\":\"string\",\"optional\":false,\"field\":\"op\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"ts_ms\"}],\"optional\":false,\"name\":\"test.schema_evolution.Envelope\"},\"payload\":{\"op\":\"c\",\"ts_ms\":1465491411816,\"before\":null,\"after\":{\"id\":2,\"name\":\"kafka\",\"age\":20,\"new_col\":\"schema_evolution_test\"},\"source\":{\"version\":\"1.9.8.Final\",\"connector\":\"mysql\",\"name\":\"test\",\"ts_ms\":0,\"snapshot\":false,\"db\":\"test\",\"table\":\"schema_evolution\",\"server_id\":0,\"gtid\":null,\"file\":\"mysql-bin.000001\",\"pos\":200,\"row\":0}}}";
+
+        produceMsg2Kafka(topic, insert2);
+        Thread.sleep(30000);
+
+        // Verify new_col was added and both rows are visible
+        List<String> expected2 =
+                Arrays.asList("1,doris,18,null", "2,kafka,20,schema_evolution_test");
+        String queryWithNewCol =
+                String.format("select id,name,age,new_col from %s.%s order by id", database, table);
+        checkResult(expected2, queryWithNewCol, 4);
+    }
+
     @AfterClass
     public static void closeInstance() {
         kafkaContainerService.deleteKafkaConnector(connectorName);

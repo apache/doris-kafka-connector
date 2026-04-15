@@ -17,6 +17,7 @@
     "converter.mode": "debezium_ingestion",
     "load.model":"stream_load",
     "key.converter":"org.apache.kafka.connect.json.JsonConverter",
-    "value.converter":"org.apache.kafka.connect.json.JsonConverter"
+    "value.converter":"org.apache.kafka.connect.json.JsonConverter",
+    "sink.properties.compress_type":""
   }
 }

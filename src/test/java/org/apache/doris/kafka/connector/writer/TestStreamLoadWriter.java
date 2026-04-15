@@ -38,6 +38,7 @@ import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.doris.kafka.connector.service.RestService;
 import org.apache.doris.kafka.connector.writer.commit.DorisCommittable;
 import org.apache.doris.kafka.connector.writer.load.DorisStreamLoad;
@@ -104,6 +105,7 @@ public class TestStreamLoadWriter {
                                 2,
                                 dorisOptions,
                                 new JdbcConnectionProvider(dorisOptions),
+                                mock(DorisSystemService.class),
                                 dorisConnectMonitor));
 
         mockRestService
@@ -136,6 +138,7 @@ public class TestStreamLoadWriter {
                         0,
                         dorisOptions,
                         new JdbcConnectionProvider(dorisOptions),
+                        mock(DorisSystemService.class),
                         dorisConnectMonitor);
         streamLoadWriter.setDorisStreamLoad(streamLoad);
 
@@ -162,6 +165,7 @@ public class TestStreamLoadWriter {
                         0,
                         dorisOptions,
                         new JdbcConnectionProvider(dorisOptions),
+                        mock(DorisSystemService.class),
                         dorisConnectMonitor);
 
         mockRestService

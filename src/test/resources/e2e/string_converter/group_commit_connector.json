@@ -18,6 +18,7 @@
     "enable.2pc": "false",
     "load.model":"stream_load",
     "key.converter":"org.apache.kafka.connect.storage.StringConverter",
-    "value.converter":"org.apache.kafka.connect.storage.StringConverter"
+    "value.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "sink.properties.compress_type":""
   }
 }

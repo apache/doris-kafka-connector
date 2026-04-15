@@ -82,11 +82,15 @@ public class RecordService {
     }
 
     public RecordService(DorisOptions dorisOptions) {
+        this(dorisOptions, new DorisSystemService(dorisOptions));
+    }
+
+    public RecordService(DorisOptions dorisOptions, DorisSystemService dorisSystemService) {
         this();
         this.dorisOptions = dorisOptions;
         this.recordTypeRegister = new RecordTypeRegister(dorisOptions);
-        this.dorisSystemService = new DorisSystemService(dorisOptions);
-        this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
+        this.dorisSystemService = dorisSystemService;
+        this.schemaChangeManager = new SchemaChangeManager(dorisOptions, dorisSystemService);
         this.schemaCreationManager = new SchemaCreationManager(dorisOptions);
         this.dorisTableDescriptorCache = new HashMap<>();
     }

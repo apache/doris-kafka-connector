@@ -31,6 +31,7 @@ import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.exception.CopyLoadException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.doris.kafka.connector.utils.FileNameUtils;
 import org.apache.doris.kafka.connector.writer.load.CopyLoad;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -50,8 +51,16 @@ public class CopyIntoWriter extends DorisWriter {
             int partition,
             DorisOptions dorisOptions,
             ConnectionProvider connectionProvider,
+            DorisSystemService dorisSystemService,
             DorisConnectMonitor connectMonitor) {
-        super(tableName, topic, partition, dorisOptions, connectionProvider, connectMonitor);
+        super(
+                tableName,
+                topic,
+                partition,
+                dorisOptions,
+                connectionProvider,
+                dorisSystemService,
+                connectMonitor);
         this.taskId = dorisOptions.getTaskId();
         this.prefix = FileNameUtils.filePrefix(dorisOptions.getName(), topic, partition);
         this.copyLoad = new CopyLoad(dbName, this.tableName, dorisOptions);

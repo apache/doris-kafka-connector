@@ -18,6 +18,7 @@
     "enable.combine.flush":"true",
     "enable.2pc": "true",
     "key.converter":"org.apache.kafka.connect.storage.StringConverter",
-    "value.converter":"org.apache.kafka.connect.storage.StringConverter"
+    "value.converter":"org.apache.kafka.connect.storage.StringConverter",
+    "sink.properties.compress_type":""
   }
 }

@@ -31,6 +31,7 @@ import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.converter.RecordService;
 import org.apache.doris.kafka.connector.exception.ArgumentsException;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,7 @@ public abstract class DorisWriter {
             int partition,
             DorisOptions dorisOptions,
             ConnectionProvider connectionProvider,
+            DorisSystemService dorisSystemService,
             DorisConnectMonitor connectMonitor) {
         this.topic = topic;
         this.partition = partition;
@@ -94,7 +96,7 @@ public abstract class DorisWriter {
 
         this.dorisOptions = dorisOptions;
         this.connectionProvider = connectionProvider;
-        this.recordService = new RecordService(dorisOptions);
+        this.recordService = new RecordService(dorisOptions, dorisSystemService);
         this.connectMonitor = connectMonitor;
     }
 

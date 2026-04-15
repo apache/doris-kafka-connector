@@ -32,8 +32,10 @@ import org.apache.doris.kafka.connector.model.KafkaRespContent;
 import org.apache.doris.kafka.connector.utils.BackendUtils;
 import org.apache.doris.kafka.connector.utils.HttpPutBuilder;
 import org.apache.doris.kafka.connector.utils.HttpUtils;
+import org.apache.doris.kafka.connector.writer.LoadConstants;
 import org.apache.doris.kafka.connector.writer.LoadStatus;
 import org.apache.doris.kafka.connector.writer.RecordBuffer;
+import org.apache.http.client.entity.GzipCompressingEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -54,6 +56,7 @@ public class DorisStreamLoad extends DataLoad {
     private final BackendUtils backendUtils;
     private Queue<KafkaRespContent> respContents = new LinkedList<>();
     private final boolean enableGroupCommit;
+    private final boolean enableGzCompress;
 
     public DorisStreamLoad(
             BackendUtils backendUtils, DorisOptions dorisOptions, String topic, String table) {
@@ -66,6 +69,11 @@ public class DorisStreamLoad extends DataLoad {
         this.backendUtils = backendUtils;
         this.topic = topic;
         this.enableGroupCommit = dorisOptions.enableGroupCommit();
+        this.enableGzCompress =
+                LoadConstants.COMPRESS_TYPE_GZ.equals(
+                        dorisOptions
+                                .getStreamLoadProp()
+                                .getProperty(LoadConstants.COMPRESS_TYPE, ""));
     }
 
     /** execute stream load. */
@@ -77,14 +85,14 @@ public class DorisStreamLoad extends DataLoad {
 
         refreshLoadUrl(database, table);
         String data = buffer.getData();
-        ByteArrayEntity entity = new ByteArrayEntity(data.getBytes(StandardCharsets.UTF_8));
+        ByteArrayEntity byteEntity = new ByteArrayEntity(data.getBytes(StandardCharsets.UTF_8));
         HttpPutBuilder putBuilder = new HttpPutBuilder();
         putBuilder
                 .setUrl(loadUrl)
                 .baseAuth(user, password)
                 .setLabel(label)
                 .addCommonHeader()
-                .setEntity(entity)
+                .setEntity(enableGzCompress ? new GzipCompressingEntity(byteEntity) : byteEntity)
                 .addHiddenColumns(dorisOptions.isEnableDelete())
                 .enable2PC(dorisOptions.enable2PC())
                 .addProperties(dorisOptions.getStreamLoadProp());

@@ -71,6 +71,32 @@ public class TestDorisOptions {
     }
 
     @Test
+    public void testDefaultCompressType() {
+        props.put("doris.urls", "10.20.30.1");
+        dorisOptions = new DorisOptions((Map) props);
+        Properties streamLoadProp = dorisOptions.getStreamLoadProp();
+        Assert.assertEquals("gz", streamLoadProp.getProperty("compress_type"));
+    }
+
+    @Test
+    public void testOverrideCompressType() {
+        props.put("doris.urls", "10.20.30.1");
+        props.put("sink.properties.compress_type", "lz4");
+        dorisOptions = new DorisOptions((Map) props);
+        Properties streamLoadProp = dorisOptions.getStreamLoadProp();
+        Assert.assertEquals("lz4", streamLoadProp.getProperty("compress_type"));
+    }
+
+    @Test
+    public void testDisableCompressType() {
+        props.put("doris.urls", "10.20.30.1");
+        props.put("sink.properties.compress_type", "");
+        dorisOptions = new DorisOptions((Map) props);
+        Properties streamLoadProp = dorisOptions.getStreamLoadProp();
+        Assert.assertEquals("", streamLoadProp.getProperty("compress_type"));
+    }
+
+    @Test
     public void testGetHttpUrls() {
         props.put("doris.urls", "10.20.30.1,10.20.30.2, 10.20.30.3");
         dorisOptions = new DorisOptions((Map) props);

@@ -71,7 +71,13 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
             int partition = -1;
             DorisWriter dorisWriter =
                     new AsyncStreamLoadWriter(
-                            tableName, topic, partition, dorisOptions, conn, connectMonitor);
+                            tableName,
+                            topic,
+                            partition,
+                            dorisOptions,
+                            conn,
+                            dorisSystemService,
+                            connectMonitor);
 
             writer.put(writerKey, dorisWriter);
             metricsJmxReporter.start();

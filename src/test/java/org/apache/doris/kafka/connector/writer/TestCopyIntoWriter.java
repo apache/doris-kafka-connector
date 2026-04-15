@@ -33,6 +33,7 @@ import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
+import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.doris.kafka.connector.writer.load.CopyLoad;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.Assert;
@@ -83,6 +84,7 @@ public class TestCopyIntoWriter {
                                 5,
                                 dorisOptions,
                                 new JdbcConnectionProvider(dorisOptions),
+                                mock(DorisSystemService.class),
                                 dorisConnectMonitor));
         doReturn(Arrays.asList(listLoadFiles)).when(copyIntoWriter).listLoadFiles();
         return copyIntoWriter;
@@ -108,6 +110,7 @@ public class TestCopyIntoWriter {
                         0,
                         dorisOptions,
                         new JdbcConnectionProvider(dorisOptions),
+                        mock(DorisSystemService.class),
                         dorisConnectMonitor);
         copyIntoWriter.setCopyLoad(mockCopyLoad);
 
@@ -129,6 +132,7 @@ public class TestCopyIntoWriter {
                         0,
                         dorisOptions,
                         new JdbcConnectionProvider(dorisOptions),
+                        mock(DorisSystemService.class),
                         dorisConnectMonitor);
         SinkRecord record = TestRecordBuffer.newSinkRecord("doris-1", 2);
         dorisWriter.putBuffer(record);

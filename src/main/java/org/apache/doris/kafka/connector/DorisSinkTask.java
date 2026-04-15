@@ -65,6 +65,9 @@ public class DorisSinkTask extends SinkTask {
     @Override
     public void stop() {
         LOG.info("kafka doris sink task stopped");
+        if (sink != null) {
+            sink.close();
+        }
     }
 
     /**
