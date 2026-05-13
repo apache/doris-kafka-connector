@@ -35,6 +35,7 @@ public class BackendUtilsTest {
 
     private ServerSocket alive;
     private int alivePort;
+
     /**
      * Port 1 on loopback is normally not bound and triggers an immediate "connection refused", so
      * the probe fails fast without waiting for the timeout.
@@ -62,8 +63,7 @@ public class BackendUtilsTest {
 
     @Test
     public void testGetAvailableBackend_returnsAliveOne() {
-        BackendUtils utils =
-                new BackendUtils(Arrays.asList(DEAD_BACKEND, aliveBackend()), 60_000L, 500);
+        BackendUtils utils = new BackendUtils(Arrays.asList(DEAD_BACKEND, aliveBackend()));
 
         String picked = utils.getAvailableBackend();
         Assert.assertEquals("127.0.0.1:" + alivePort, picked);
@@ -71,15 +71,13 @@ public class BackendUtilsTest {
 
     @Test(expected = DorisException.class)
     public void testGetAvailableBackend_allDead() {
-        BackendUtils utils =
-                new BackendUtils(Collections.singletonList(DEAD_BACKEND), 60_000L, 500);
+        BackendUtils utils = new BackendUtils(Collections.singletonList(DEAD_BACKEND));
         utils.getAvailableBackend();
     }
 
     @Test
     public void testCacheHit_skipsProbe() throws IOException {
-        BackendUtils utils =
-                new BackendUtils(Collections.singletonList(aliveBackend()), 60_000L, 500);
+        BackendUtils utils = new BackendUtils(Collections.singletonList(aliveBackend()));
 
         String first = utils.getAvailableBackend();
 
@@ -93,8 +91,7 @@ public class BackendUtilsTest {
 
     @Test
     public void testInvalidateCache_forcesReProbe() throws IOException {
-        BackendUtils utils =
-                new BackendUtils(Collections.singletonList(aliveBackend()), 60_000L, 500);
+        BackendUtils utils = new BackendUtils(Collections.singletonList(aliveBackend()));
 
         String first = utils.getAvailableBackend();
         Assert.assertNotNull(first);
@@ -111,47 +108,16 @@ public class BackendUtilsTest {
     }
 
     @Test
-    public void testCacheTtl_expiresAndReProbes() throws IOException, InterruptedException {
-        BackendUtils utils = new BackendUtils(Collections.singletonList(aliveBackend()), 50L, 500);
-
-        String first = utils.getAvailableBackend();
-        Assert.assertNotNull(first);
-
-        alive.close();
-        Thread.sleep(120L);
-
-        try {
-            utils.getAvailableBackend();
-            Assert.fail("expected DorisException after TTL expired and the backend is gone");
-        } catch (DorisException expected) {
-            // ok
-        }
-    }
-
-    @Test
-    public void testZeroTtl_disablesCache() throws IOException {
-        BackendUtils utils = new BackendUtils(Collections.singletonList(aliveBackend()), 0L, 500);
-
-        Assert.assertNotNull(utils.getAvailableBackend());
-
-        alive.close();
-        try {
-            utils.getAvailableBackend();
-            Assert.fail("expected DorisException because the cache is disabled");
-        } catch (DorisException expected) {
-            // ok
-        }
-    }
-
-    @Test
-    public void testTryHttpConnection_shortTimeoutOnUnreachable() {
+    public void testTryHttpConnection_failsFastOnUnreachable() {
         long start = System.currentTimeMillis();
-        boolean ok = BackendUtils.tryHttpConnection("127.0.0.1:1", 500);
+        boolean ok = BackendUtils.tryHttpConnection("127.0.0.1:1");
         long elapsedMs = System.currentTimeMillis() - start;
 
         Assert.assertFalse(ok);
+        // The previous implementation used a 60s connect timeout. The probe should now fail fast
+        // for an unreachable backend.
         Assert.assertTrue(
-                "probe should respect the configured short timeout, was " + elapsedMs + "ms",
+                "probe should fail fast on connection refused, was " + elapsedMs + "ms",
                 elapsedMs < 5_000L);
     }
 }

@@ -32,13 +32,13 @@ import org.slf4j.LoggerFactory;
 public class BackendUtils {
     private static final Logger LOG = LoggerFactory.getLogger(BackendUtils.class);
 
-    public static final long DEFAULT_CACHE_TTL_MS = 60_000L;
+    /** TTL of the cached available backend (ms). */
+    private static final long CACHE_TTL_MS = 60_000L;
 
-    public static final int DEFAULT_PROBE_TIMEOUT_MS = 5_000;
+    /** HTTP connect/read timeout (ms) when probing a backend. */
+    private static final int PROBE_TIMEOUT_MS = 5_000;
 
     private final List<BackendV2.BackendRowV2> backends;
-    private final long cacheTtlMs;
-    private final int probeTimeoutMs;
     private final Object lock = new Object();
 
     private long pos;
@@ -46,22 +46,12 @@ public class BackendUtils {
     private volatile long cachedAtNanos;
 
     public BackendUtils(List<BackendV2.BackendRowV2> backends) {
-        this(backends, DEFAULT_CACHE_TTL_MS, DEFAULT_PROBE_TIMEOUT_MS);
-    }
-
-    public BackendUtils(
-            List<BackendV2.BackendRowV2> backends, long cacheTtlMs, int probeTimeoutMs) {
         this.backends = backends;
-        this.cacheTtlMs = cacheTtlMs;
-        this.probeTimeoutMs = probeTimeoutMs;
         this.pos = 0;
     }
 
     public static BackendUtils getInstance(DorisOptions dorisOptions, Logger logger) {
-        return new BackendUtils(
-                RestService.getBackendsV2(dorisOptions, logger),
-                dorisOptions.getBackendCacheTtlMs(),
-                dorisOptions.getBackendProbeTimeoutMs());
+        return new BackendUtils(RestService.getBackendsV2(dorisOptions, logger));
     }
 
     /**
@@ -104,11 +94,8 @@ public class BackendUtils {
     }
 
     private boolean isCacheExpired() {
-        if (cacheTtlMs <= 0L) {
-            return true;
-        }
         long elapsedMs = (System.nanoTime() - cachedAtNanos) / 1_000_000L;
-        return elapsedMs >= cacheTtlMs;
+        return elapsedMs >= CACHE_TTL_MS;
     }
 
     private String pickBackendLocked() {
@@ -116,7 +103,7 @@ public class BackendUtils {
         while (pos < tmp) {
             BackendV2.BackendRowV2 backend = backends.get((int) (pos++ % backends.size()));
             String res = backend.toBackendString();
-            if (tryHttpConnection(res, probeTimeoutMs)) {
+            if (tryHttpConnection(res)) {
                 return res;
             }
         }
@@ -124,16 +111,12 @@ public class BackendUtils {
     }
 
     public static boolean tryHttpConnection(String backend) {
-        return tryHttpConnection(backend, DEFAULT_PROBE_TIMEOUT_MS);
-    }
-
-    public static boolean tryHttpConnection(String backend, int connectTimeoutMs) {
         HttpURLConnection co = null;
         try {
             URL url = new URL("http://" + backend);
             co = (HttpURLConnection) url.openConnection();
-            co.setConnectTimeout(connectTimeoutMs);
-            co.setReadTimeout(connectTimeoutMs);
+            co.setConnectTimeout(PROBE_TIMEOUT_MS);
+            co.setReadTimeout(PROBE_TIMEOUT_MS);
             co.connect();
             return true;
         } catch (Exception ex) {

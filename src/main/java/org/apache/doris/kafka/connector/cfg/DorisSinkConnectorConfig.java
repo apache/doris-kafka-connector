@@ -75,10 +75,6 @@ public class DorisSinkConnectorConfig {
     public static final String REQUEST_CONNECT_TIMEOUT_MS = "request.connect.timeout.ms";
     public static final Integer DORIS_REQUEST_READ_TIMEOUT_MS_DEFAULT = 30 * 1000;
     public static final Integer DORIS_REQUEST_CONNECT_TIMEOUT_MS_DEFAULT = 30 * 1000;
-    public static final String BACKEND_CACHE_TTL_MS = "backend.cache.ttl.ms";
-    public static final long BACKEND_CACHE_TTL_MS_DEFAULT = 60 * 1000L;
-    public static final String BACKEND_PROBE_TIMEOUT_MS = "backend.probe.timeout.ms";
-    public static final int BACKEND_PROBE_TIMEOUT_MS_DEFAULT = 5 * 1000;
     public static final String DATABASE_TIME_ZONE = "database.time_zone";
     public static final String DATABASE_TIME_ZONE_DEFAULT = "UTC";
     public static final String LOAD_MODEL = "load.model";
@@ -357,29 +353,7 @@ public class DorisSinkConnectorConfig {
                         ConfigDef.Type.BOOLEAN,
                         JMX_OPT_DEFAULT,
                         ConfigDef.Importance.HIGH,
-                        "Whether to enable JMX MBeans for custom metrics")
-                .define(
-                        BACKEND_CACHE_TTL_MS,
-                        Type.LONG,
-                        BACKEND_CACHE_TTL_MS_DEFAULT,
-                        ConfigDef.Range.atLeast(0),
-                        Importance.LOW,
-                        "TTL (in ms) of the cached available Doris BE selected by BackendUtils. Within the TTL, the same BE is reused without an HTTP probe on every stream load. 0 disables the cache.",
-                        DORIS_INFO,
-                        20,
-                        ConfigDef.Width.NONE,
-                        BACKEND_CACHE_TTL_MS)
-                .define(
-                        BACKEND_PROBE_TIMEOUT_MS,
-                        Type.INT,
-                        BACKEND_PROBE_TIMEOUT_MS_DEFAULT,
-                        ConfigDef.Range.atLeast(1),
-                        Importance.LOW,
-                        "HTTP connect timeout (in ms) when BackendUtils probes a Doris BE. The previous default was 60s which could block writes for a long time when a BE is unreachable.",
-                        DORIS_INFO,
-                        21,
-                        ConfigDef.Width.NONE,
-                        BACKEND_PROBE_TIMEOUT_MS);
+                        "Whether to enable JMX MBeans for custom metrics");
     }
 
     public static class TopicToTableValidator implements ConfigDef.Validator {
