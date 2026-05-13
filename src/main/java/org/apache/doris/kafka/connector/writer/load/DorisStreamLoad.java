@@ -135,6 +135,7 @@ public class DorisStreamLoad extends DataLoad {
             }
 
             LOG.warn(err, ex);
+            backendUtils.invalidateCache();
             throw new StreamLoadException(err, ex);
         }
     }

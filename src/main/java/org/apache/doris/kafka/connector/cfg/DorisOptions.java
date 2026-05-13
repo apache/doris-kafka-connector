@@ -71,6 +71,8 @@ public class DorisOptions {
     private final int retryIntervalMs;
     private final BehaviorOnNullValues behaviorOnNullValues;
     private final boolean enableCombineFlush;
+    private final long backendCacheTtlMs;
+    private final int backendProbeTimeoutMs;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -155,6 +157,19 @@ public class DorisOptions {
         this.behaviorOnNullValues =
                 BehaviorOnNullValues.of(
                         config.get(DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES));
+        this.backendCacheTtlMs =
+                Long.parseLong(
+                        config.getOrDefault(
+                                DorisSinkConnectorConfig.BACKEND_CACHE_TTL_MS,
+                                String.valueOf(
+                                        DorisSinkConnectorConfig.BACKEND_CACHE_TTL_MS_DEFAULT)));
+        this.backendProbeTimeoutMs =
+                Integer.parseInt(
+                        config.getOrDefault(
+                                DorisSinkConnectorConfig.BACKEND_PROBE_TIMEOUT_MS,
+                                String.valueOf(
+                                        DorisSinkConnectorConfig
+                                                .BACKEND_PROBE_TIMEOUT_MS_DEFAULT)));
     }
 
     private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
@@ -364,5 +379,13 @@ public class DorisOptions {
 
     public boolean isEnableCombineFlush() {
         return enableCombineFlush;
+    }
+
+    public long getBackendCacheTtlMs() {
+        return backendCacheTtlMs;
+    }
+
+    public int getBackendProbeTimeoutMs() {
+        return backendProbeTimeoutMs;
     }
 }

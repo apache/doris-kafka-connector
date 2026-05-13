@@ -111,6 +111,7 @@ public class DorisCommitter {
                                     "commit failed with {}, reason {}",
                                     hostPort.get(),
                                     reasonPhrase);
+                            backendUtils.invalidateCache();
                             hostPort.set(backendUtils.getAvailableBackend());
                             throw new StreamLoadException(
                                     "commit failed with {"
@@ -120,6 +121,7 @@ public class DorisCommitter {
                                             + "}");
                         } catch (Exception e) {
                             LOG.error("commit transaction failed, to retry, {}", e.getMessage());
+                            backendUtils.invalidateCache();
                             hostPort.set(backendUtils.getAvailableBackend());
                             throw new StreamLoadException("commit transaction failed.", e);
                         }
