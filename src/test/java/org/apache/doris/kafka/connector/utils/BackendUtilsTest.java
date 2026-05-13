@@ -62,7 +62,7 @@ public class BackendUtilsTest {
     }
 
     @Test
-    public void testGetAvailableBackend_returnsAliveOne() {
+    public void testGetAvailableBackendReturnsAliveOne() {
         BackendUtils utils = new BackendUtils(Arrays.asList(DEAD_BACKEND, aliveBackend()));
 
         String picked = utils.getAvailableBackend();
@@ -70,13 +70,13 @@ public class BackendUtilsTest {
     }
 
     @Test(expected = DorisException.class)
-    public void testGetAvailableBackend_allDead() {
+    public void testGetAvailableBackendAllDead() {
         BackendUtils utils = new BackendUtils(Collections.singletonList(DEAD_BACKEND));
         utils.getAvailableBackend();
     }
 
     @Test
-    public void testCacheHit_skipsProbe() throws IOException {
+    public void testCacheHitSkipsProbe() throws IOException {
         BackendUtils utils = new BackendUtils(Collections.singletonList(aliveBackend()));
 
         String first = utils.getAvailableBackend();
@@ -90,7 +90,7 @@ public class BackendUtilsTest {
     }
 
     @Test
-    public void testInvalidateCache_forcesReProbe() throws IOException {
+    public void testInvalidateCacheForcesReProbe() throws IOException {
         BackendUtils utils = new BackendUtils(Collections.singletonList(aliveBackend()));
 
         String first = utils.getAvailableBackend();
