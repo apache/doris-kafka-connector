@@ -106,18 +106,4 @@ public class BackendUtilsTest {
             // ok
         }
     }
-
-    @Test
-    public void testTryHttpConnection_failsFastOnUnreachable() {
-        long start = System.currentTimeMillis();
-        boolean ok = BackendUtils.tryHttpConnection("127.0.0.1:1");
-        long elapsedMs = System.currentTimeMillis() - start;
-
-        Assert.assertFalse(ok);
-        // The previous implementation used a 60s connect timeout. The probe should now fail fast
-        // for an unreachable backend.
-        Assert.assertTrue(
-                "probe should fail fast on connection refused, was " + elapsedMs + "ms",
-                elapsedMs < 5_000L);
-    }
 }

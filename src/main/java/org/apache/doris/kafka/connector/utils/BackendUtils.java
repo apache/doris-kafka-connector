@@ -33,17 +33,12 @@ public class BackendUtils {
     private static final Logger LOG = LoggerFactory.getLogger(BackendUtils.class);
 
     /** TTL of the cached available backend (ms). */
-    private static final long CACHE_TTL_MS = 60_000L;
-
-    /** HTTP connect/read timeout (ms) when probing a backend. */
-    private static final int PROBE_TIMEOUT_MS = 5_000;
+    private static final long CACHE_TTL_MS = 30_000L;
 
     private final List<BackendV2.BackendRowV2> backends;
-    private final Object lock = new Object();
-
     private long pos;
-    private volatile String cachedBackend;
-    private volatile long cachedAtNanos;
+    private String cachedBackend;
+    private long cachedAtNanos;
 
     public BackendUtils(List<BackendV2.BackendRowV2> backends) {
         this.backends = backends;
@@ -55,50 +50,35 @@ public class BackendUtils {
     }
 
     /**
-     * Pick a usable backend. The previously chosen backend is reused while it is still within the
-     * cache TTL, so the hot write path does not pay for an HTTP probe on every call. When the cache
-     * is empty/expired we fall back to the round-robin probe behaviour.
+     * Pick a usable backend. The previously chosen backend is reused while still within the cache
+     * TTL so the hot write path does not pay for an HTTP probe on every call.
      */
     public String getAvailableBackend() {
-        String cached = cachedBackend;
-        if (cached != null && !isCacheExpired()) {
-            return cached;
+        if (cachedBackend != null && !isCacheExpired()) {
+            return cachedBackend;
         }
-
-        synchronized (lock) {
-            cached = cachedBackend;
-            if (cached != null && !isCacheExpired()) {
-                return cached;
-            }
-
-            String picked = pickBackendLocked();
-            cachedBackend = picked;
-            cachedAtNanos = System.nanoTime();
-            return picked;
-        }
+        cachedBackend = pickBackend();
+        cachedAtNanos = System.nanoTime();
+        return cachedBackend;
     }
 
     /**
-     * Invalidate the cached backend. Callers should invoke this after a stream load / commit
-     * failure so that the next {@link #getAvailableBackend()} probes a fresh node instead of
-     * returning the failing one again.
+     * Drop the cached backend so the next {@link #getAvailableBackend()} re-probes. Callers should
+     * invoke this after a stream load / commit failure to avoid sticking to a failing BE.
      */
     public void invalidateCache() {
-        synchronized (lock) {
-            if (cachedBackend != null) {
-                LOG.info("Invalidate cached doris backend {}", cachedBackend);
-            }
-            cachedBackend = null;
-            cachedAtNanos = 0L;
+        if (cachedBackend != null) {
+            LOG.info("Invalidate cached doris backend {}", cachedBackend);
         }
+        cachedBackend = null;
+        cachedAtNanos = 0L;
     }
 
     private boolean isCacheExpired() {
-        long elapsedMs = (System.nanoTime() - cachedAtNanos) / 1_000_000L;
-        return elapsedMs >= CACHE_TTL_MS;
+        return (System.nanoTime() - cachedAtNanos) / 1_000_000L >= CACHE_TTL_MS;
     }
 
-    private String pickBackendLocked() {
+    private String pickBackend() {
         long tmp = pos + backends.size();
         while (pos < tmp) {
             BackendV2.BackendRowV2 backend = backends.get((int) (pos++ % backends.size()));
@@ -111,25 +91,17 @@ public class BackendUtils {
     }
 
     public static boolean tryHttpConnection(String backend) {
-        HttpURLConnection co = null;
         try {
-            URL url = new URL("http://" + backend);
-            co = (HttpURLConnection) url.openConnection();
-            co.setConnectTimeout(PROBE_TIMEOUT_MS);
-            co.setReadTimeout(PROBE_TIMEOUT_MS);
+            backend = "http://" + backend;
+            URL url = new URL(backend);
+            HttpURLConnection co = (HttpURLConnection) url.openConnection();
+            co.setConnectTimeout(60000);
             co.connect();
+            co.disconnect();
             return true;
         } catch (Exception ex) {
             LOG.warn("Failed to connect to backend:{}", backend, ex);
             return false;
-        } finally {
-            if (co != null) {
-                try {
-                    co.disconnect();
-                } catch (Exception ignored) {
-                    // no-op
-                }
-            }
         }
     }
 }
