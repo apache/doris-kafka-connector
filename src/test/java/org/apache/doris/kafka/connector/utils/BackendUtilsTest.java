@@ -34,7 +34,9 @@ import org.junit.Test;
 public class BackendUtilsTest {
 
     private ServerSocket alive;
+    private ServerSocket alive2;
     private int alivePort;
+    private int alivePort2;
 
     /**
      * Port 1 on loopback is normally not bound and triggers an immediate "connection refused", so
@@ -48,6 +50,10 @@ public class BackendUtilsTest {
         alive = new ServerSocket();
         alive.bind(new InetSocketAddress("127.0.0.1", 0));
         alivePort = alive.getLocalPort();
+
+        alive2 = new ServerSocket();
+        alive2.bind(new InetSocketAddress("127.0.0.1", 0));
+        alivePort2 = alive2.getLocalPort();
     }
 
     @After
@@ -55,10 +61,17 @@ public class BackendUtilsTest {
         if (alive != null) {
             alive.close();
         }
+        if (alive2 != null) {
+            alive2.close();
+        }
     }
 
     private BackendV2.BackendRowV2 aliveBackend() {
         return BackendV2.BackendRowV2.of("127.0.0.1", alivePort, true);
+    }
+
+    private BackendV2.BackendRowV2 aliveBackend2() {
+        return BackendV2.BackendRowV2.of("127.0.0.1", alivePort2, true);
     }
 
     @Test
@@ -76,13 +89,25 @@ public class BackendUtilsTest {
     }
 
     @Test
-    public void testCacheHitSkipsProbe() throws IOException {
+    public void testRoundRobinAcrossBackends() {
+        BackendUtils utils = new BackendUtils(Arrays.asList(aliveBackend(), aliveBackend2()));
+
+        String first = utils.getAvailableBackend();
+        String second = utils.getAvailableBackend();
+
+        Assert.assertEquals("127.0.0.1:" + alivePort, first);
+        Assert.assertEquals("127.0.0.1:" + alivePort2, second);
+        Assert.assertNotEquals(first, second);
+    }
+
+    @Test
+    public void testProbeCacheHitSkipsProbe() throws IOException {
         BackendUtils utils = new BackendUtils(Collections.singletonList(aliveBackend()));
 
         String first = utils.getAvailableBackend();
 
-        // Stop the only alive server. If the cache is honoured the next call must still return
-        // the previously selected backend without performing a fresh probe.
+        // Stop the only alive server. Within the probe-cache TTL the next call must still return
+        // this backend without performing a fresh HTTP probe.
         alive.close();
 
         String second = utils.getAvailableBackend();
