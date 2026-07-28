@@ -24,6 +24,7 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.model.BackendV2;
@@ -60,7 +61,10 @@ public class BackendUtils {
         while (pos < tmp) {
             BackendV2.BackendRowV2 backend = backends.get((int) (pos++ % backends.size()));
             String res = backend.toBackendString();
-            if (isRecentlyAlive(res) || tryHttpConnection(res)) {
+            if (isRecentlyAlive(res)) {
+                return res;
+            }
+            if (tryHttpConnection(res)) {
                 aliveProbeAtNanos.put(res, System.nanoTime());
                 return res;
             }
