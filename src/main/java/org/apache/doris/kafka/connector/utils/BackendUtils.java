@@ -21,7 +21,9 @@ package org.apache.doris.kafka.connector.utils;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.model.BackendV2;
@@ -31,8 +33,14 @@ import org.slf4j.LoggerFactory;
 
 public class BackendUtils {
     private static final Logger LOG = LoggerFactory.getLogger(BackendUtils.class);
+
+    /** TTL of a successful HTTP probe result for a BE (ms). */
+    private static final long PROBE_CACHE_TTL_MS = 5_000L;
+
     private final List<BackendV2.BackendRowV2> backends;
     private long pos;
+    /** backend -> last successful probe time (nanos). */
+    private final Map<String, Long> aliveProbeAtNanos = new HashMap<>();
 
     public BackendUtils(List<BackendV2.BackendRowV2> backends) {
         this.backends = backends;
@@ -43,16 +51,45 @@ public class BackendUtils {
         return new BackendUtils(RestService.getBackendsV2(dorisOptions, logger));
     }
 
+    /**
+     * Pick a usable backend via round-robin so load is balanced across BEs. A BE that was recently
+     * probed alive skips the HTTP probe within {@link #PROBE_CACHE_TTL_MS}.
+     */
     public String getAvailableBackend() {
         long tmp = pos + backends.size();
         while (pos < tmp) {
             BackendV2.BackendRowV2 backend = backends.get((int) (pos++ % backends.size()));
             String res = backend.toBackendString();
-            if (tryHttpConnection(res)) {
+            if (isRecentlyAlive(res)) {
                 return res;
             }
+            if (tryHttpConnection(res)) {
+                aliveProbeAtNanos.put(res, System.nanoTime());
+                return res;
+            }
+            aliveProbeAtNanos.remove(res);
         }
+        invalidateCache();
         throw new DorisException("no available backend.");
+    }
+
+    /**
+     * Clear cached probe results. Callers should invoke this after a stream load / commit failure
+     * so the next {@link #getAvailableBackend()} re-probes instead of trusting a stale result.
+     */
+    public void invalidateCache() {
+        if (!aliveProbeAtNanos.isEmpty()) {
+            LOG.info("Invalidate doris backend probe cache, size={}", aliveProbeAtNanos.size());
+        }
+        aliveProbeAtNanos.clear();
+    }
+
+    private boolean isRecentlyAlive(String backend) {
+        Long probedAt = aliveProbeAtNanos.get(backend);
+        if (probedAt == null) {
+            return false;
+        }
+        return (System.nanoTime() - probedAt) / 1_000_000L < PROBE_CACHE_TTL_MS;
     }
 
     public static boolean tryHttpConnection(String backend) {
