@@ -20,6 +20,7 @@ package org.apache.doris.kafka.connector.converter;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,6 +34,7 @@ import org.apache.kafka.connect.sink.SinkRecord;
 public class RecordDescriptor {
     private final SinkRecord record;
     private final String topicName;
+    private final LinkedHashSet<String> keyFieldNames;
     private final List<String> nonKeyFieldNames;
     private final Map<String, FieldDescriptor> fields;
     private final boolean flattened;
@@ -46,6 +48,22 @@ public class RecordDescriptor {
         this.record = record;
         this.topicName = topicName;
         this.nonKeyFieldNames = nonKeyFieldNames;
+        this.keyFieldNames = new LinkedHashSet<String>();
+        this.fields = fields;
+        this.flattened = flattened;
+    }
+
+    private RecordDescriptor(
+            SinkRecord record,
+            String topicName,
+            List<String> nonKeyFieldNames,
+            LinkedHashSet<String> keyFieldNames,
+            Map<String, FieldDescriptor> fields,
+            boolean flattened) {
+        this.record = record;
+        this.topicName = topicName;
+        this.nonKeyFieldNames = nonKeyFieldNames;
+        this.keyFieldNames = keyFieldNames;
         this.fields = fields;
         this.flattened = flattened;
     }
@@ -60,6 +78,10 @@ public class RecordDescriptor {
 
     public long getOffset() {
         return record.kafkaOffset();
+    }
+
+    public LinkedHashSet<String> getKeyFieldNames() {
+        return keyFieldNames;
     }
 
     public List<String> getNonKeyFieldNames() {
@@ -161,6 +183,7 @@ public class RecordDescriptor {
         private Map<String, Type> typeRegistry;
 
         // Internal build state
+        private final LinkedHashSet<String> keyFieldNames = new LinkedHashSet<>();
         private final List<String> nonKeyFieldNames = new ArrayList<>();
         private final Map<String, FieldDescriptor> allFields = new LinkedHashMap<>();
 
@@ -178,20 +201,47 @@ public class RecordDescriptor {
             Objects.requireNonNull(sinkRecord, "The sink record must be provided.");
 
             final boolean flattened = !isTombstone(sinkRecord) && isFlattened(sinkRecord);
+            final boolean keyFlattened = !keyIsTombstone(sinkRecord) && keyIsFlattened(sinkRecord);
             readSinkRecordNonKeyData(sinkRecord, flattened);
+            readSinkRecordKeyData(sinkRecord, keyFlattened);
 
-            return new RecordDescriptor(
-                    sinkRecord, sinkRecord.topic(), nonKeyFieldNames, allFields, flattened);
+            if (keyFieldNames.isEmpty()) {
+                return new RecordDescriptor(
+                        sinkRecord, sinkRecord.topic(), nonKeyFieldNames, allFields, flattened);
+            } else {
+                return new RecordDescriptor(
+                        sinkRecord,
+                        sinkRecord.topic(),
+                        nonKeyFieldNames,
+                        keyFieldNames,
+                        allFields,
+                        flattened);
+            }
         }
 
         private boolean isFlattened(SinkRecord record) {
-            return record.valueSchema().name() == null
-                    || !record.valueSchema().name().contains("Envelope");
+            final Schema valueSchema = record.valueSchema();
+            if (valueSchema == null || valueSchema.name() == null) {
+                return true;
+            }
+            return !record.valueSchema().name().contains("Envelope");
+        }
+
+        private boolean keyIsFlattened(SinkRecord record) {
+            final Schema keySchema = record.keySchema();
+            if (keySchema == null || keySchema.name() == null) {
+                return true;
+            }
+            return !keySchema.name().contains("Key");
         }
 
         private boolean isTombstone(SinkRecord record) {
 
             return record.value() == null && record.valueSchema() == null;
+        }
+
+        private boolean keyIsTombstone(SinkRecord record) {
+            return record.key() == null && record.keySchema() == null;
         }
 
         private void readSinkRecordNonKeyData(SinkRecord record, boolean flattened) {
@@ -212,6 +262,15 @@ public class RecordDescriptor {
             }
         }
 
+        private void readSinkRecordKeyData(SinkRecord record, boolean flattened) {
+            final Schema keySchema = record.keySchema();
+            if (keySchema != null) {
+                if (!flattened) {
+                    applyKeyFields(keySchema);
+                }
+            }
+        }
+
         private void applyNonKeyFields(Schema schema) {
             for (Field field : schema.fields()) {
                 applyNonKeyField(field.name(), field.schema());
@@ -222,6 +281,12 @@ public class RecordDescriptor {
             FieldDescriptor fieldDescriptor = new FieldDescriptor(schema, name, typeRegistry);
             nonKeyFieldNames.add(fieldDescriptor.getName());
             allFields.put(fieldDescriptor.getName(), fieldDescriptor);
+        }
+
+        private void applyKeyFields(Schema schema) {
+            for (Field field : schema.fields()) {
+                keyFieldNames.add(field.name());
+            }
         }
     }
 }

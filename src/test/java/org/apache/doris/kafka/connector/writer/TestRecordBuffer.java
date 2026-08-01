@@ -59,4 +59,15 @@ public class TestRecordBuffer {
                         topic, 0, Schema.OPTIONAL_STRING_SCHEMA, "key", valueSchema, value, offset);
         return record;
     }
+
+    public static SinkRecord newSinkRecord(
+            String topic,
+            Schema keySchema,
+            Schema valueSchema,
+            Object key,
+            Object value,
+            long offset) {
+        SinkRecord record = new SinkRecord(topic, 0, keySchema, key, valueSchema, value, offset);
+        return record;
+    }
 }

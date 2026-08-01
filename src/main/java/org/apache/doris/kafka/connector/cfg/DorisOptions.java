@@ -60,6 +60,8 @@ public class DorisOptions {
     private boolean enableGroupCommit;
     /** Properties for the StreamLoad. */
     private final Properties streamLoadProp;
+    /** Properties for table config */
+    private final Properties tableConfigProp;
 
     @Deprecated private String labelPrefix;
     private final String databaseTimeZone;
@@ -155,6 +157,9 @@ public class DorisOptions {
         this.behaviorOnNullValues =
                 BehaviorOnNullValues.of(
                         config.get(DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES));
+
+        /** Table config properties */
+        this.tableConfigProp = getTableConfigPropFromConfig(config);
     }
 
     private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
@@ -177,6 +182,27 @@ public class DorisOptions {
         properties.setProperty("format", "json");
         properties.setProperty("read_json_by_line", "true");
         properties.setProperty("compress_type", "gz");
+        return properties;
+    }
+
+    private Properties getTableConfigPropFromConfig(Map<String, String> config) {
+        Properties properties = new Properties();
+        properties.putAll(getTableConfigDefaultValues());
+        for (Map.Entry<String, String> entry : config.entrySet()) {
+            if (entry.getKey().startsWith(DorisSinkConnectorConfig.TABLE_CONFIG_PROP_PREFIX)) {
+                String subKey =
+                        entry.getKey()
+                                .substring(
+                                        DorisSinkConnectorConfig.TABLE_CONFIG_PROP_PREFIX.length());
+                properties.put(subKey, entry.getValue());
+            }
+        }
+        return properties;
+    }
+
+    private Properties getTableConfigDefaultValues() {
+        Properties properties = new Properties();
+        properties.setProperty("replication_num", "3");
         return properties;
     }
 
@@ -364,5 +390,9 @@ public class DorisOptions {
 
     public boolean isEnableCombineFlush() {
         return enableCombineFlush;
+    }
+
+    public Properties getTableConfigProp() {
+        return tableConfigProp;
     }
 }

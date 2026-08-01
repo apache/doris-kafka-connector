@@ -50,6 +50,8 @@ import org.apache.doris.kafka.connector.converter.type.debezium.TimestampType;
 import org.apache.doris.kafka.connector.converter.type.debezium.VariableScaleDecimalType;
 import org.apache.doris.kafka.connector.converter.type.debezium.ZonedTimeType;
 import org.apache.doris.kafka.connector.converter.type.debezium.ZonedTimestampType;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisDecimalType;
+import org.apache.doris.kafka.connector.converter.type.doris.DorisJsonType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +99,10 @@ public class RecordTypeRegister {
         registerType(ConnectTimestampType.INSTANCE);
         registerType(ConnectTimeType.INSTANCE);
         registerType(ConnectMapToConnectStringType.INSTANCE);
+
+        // Override doris data types
+        registerType(DorisJsonType.INSTANCE);
+        registerType(DorisDecimalType.INSTANCE);
     }
 
     protected void registerType(Type type) {
