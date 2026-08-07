@@ -24,8 +24,11 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.Collections;
+import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.model.BackendV2;
+import org.apache.doris.kafka.connector.testutil.DorisOptionsTestUtils;
+import org.apache.doris.kafka.connector.testutil.HttpsTestServer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -129,6 +132,17 @@ public class BackendUtilsTest {
             Assert.fail("expected DorisException after the only backend went away");
         } catch (DorisException expected) {
             // ok
+        }
+    }
+
+    @Test
+    public void testTlsBackendProbe() throws Exception {
+        try (HttpsTestServer server = new HttpsTestServer()) {
+            DorisOptions options = DorisOptionsTestUtils.tlsOptions("localhost", server.getPort());
+
+            Assert.assertTrue(
+                    BackendUtils.tryHttpConnection(
+                            server.getEndpoint("localhost"), options.getTlsOptions()));
         }
     }
 }

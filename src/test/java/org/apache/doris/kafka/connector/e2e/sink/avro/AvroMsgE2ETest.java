@@ -59,7 +59,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
     }
 
     public static void initialize(String connectorPath) {
-        jsonMsgConnectorContent = loadContent(connectorPath);
+        jsonMsgConnectorContent = configureDorisConnector(loadContent(connectorPath));
         JsonNode rootNode = null;
         try {
             rootNode = objectMapper.readTree(jsonMsgConnectorContent);
@@ -91,8 +91,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
         initialize("src/test/resources/e2e/avro_converter/confluent_avro_convert.json");
 
         // replace file path
-        String connectJson =
-                loadContent("src/test/resources/e2e/avro_converter/confluent_avro_convert.json");
+        String connectJson = jsonMsgConnectorContent;
         JsonNode jsonNode = new ObjectMapper().readTree(connectJson);
         ObjectNode configNode = (ObjectNode) jsonNode.get("config");
 
@@ -134,8 +133,7 @@ public class AvroMsgE2ETest extends AbstractAvroE2ESinkTest {
         initByteProducer();
         initialize("src/test/resources/e2e/avro_converter/doris_avro_convert.json");
         // replace file path
-        String connectJson =
-                loadContent("src/test/resources/e2e/avro_converter/doris_avro_convert.json");
+        String connectJson = jsonMsgConnectorContent;
         JsonNode jsonNode = new ObjectMapper().readTree(connectJson);
         ObjectNode configNode = (ObjectNode) jsonNode.get("config");
 

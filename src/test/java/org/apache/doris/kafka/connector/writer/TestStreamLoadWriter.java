@@ -40,6 +40,7 @@ import org.apache.doris.kafka.connector.connection.JdbcConnectionProvider;
 import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.doris.kafka.connector.service.RestService;
+import org.apache.doris.kafka.connector.utils.BackendUtils;
 import org.apache.doris.kafka.connector.writer.commit.DorisCommittable;
 import org.apache.doris.kafka.connector.writer.load.DorisStreamLoad;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -197,6 +198,30 @@ public class TestStreamLoadWriter {
                 .thenReturn(false);
         dorisWriter.checkDorisTableKey("not_unique_table");
         Assert.assertTrue(dorisOptions.enable2PC());
+    }
+
+    @Test
+    public void testTableKeyCheckRunsBeforeLoadResourcesAreCreated() {
+        mockRestService
+                .when(() -> RestService.isUniqueKeyType(any(), any(), any()))
+                .thenThrow(new IllegalStateException("table check failed"));
+
+        try (MockedStatic<BackendUtils> mockedBackendUtils = mockStatic(BackendUtils.class)) {
+            try {
+                new StreamLoadWriter(
+                        "avro-complex10",
+                        "avro-complex10",
+                        0,
+                        dorisOptions,
+                        new JdbcConnectionProvider(dorisOptions),
+                        mock(DorisSystemService.class),
+                        mock(DorisConnectMonitor.class));
+                Assert.fail("Expected table key check to fail");
+            } catch (IllegalStateException expected) {
+                Assert.assertEquals("table check failed", expected.getMessage());
+            }
+            mockedBackendUtils.verifyNoInteractions();
+        }
     }
 
     @After

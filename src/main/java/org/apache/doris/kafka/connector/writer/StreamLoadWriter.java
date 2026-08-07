@@ -73,11 +73,16 @@ public class StreamLoadWriter extends DorisWriter {
                 connectMonitor);
         this.taskId = dorisOptions.getTaskId();
         this.labelGenerator = new LabelGenerator(topic, partition, tableIdentifier);
+        checkDorisTableKey(this.tableName);
         BackendUtils backendUtils = BackendUtils.getInstance(dorisOptions, LOG);
         this.dorisCommitter = new DorisCommitter(dorisOptions, backendUtils);
-        this.dorisStreamLoad =
-                new DorisStreamLoad(backendUtils, dorisOptions, topic, this.tableName);
-        checkDorisTableKey(this.tableName);
+        try {
+            this.dorisStreamLoad =
+                    new DorisStreamLoad(backendUtils, dorisOptions, topic, this.tableName);
+        } catch (RuntimeException e) {
+            this.dorisCommitter.close();
+            throw e;
+        }
     }
 
     /** The uniq model has 2pc close by default unless 2pc is forced open. */
@@ -212,5 +217,11 @@ public class StreamLoadWriter extends DorisWriter {
     @VisibleForTesting
     public void setCommittableList(List<DorisCommittable> committableList) {
         this.committableList = committableList;
+    }
+
+    @Override
+    public void close() {
+        dorisStreamLoad.close();
+        dorisCommitter.close();
     }
 }

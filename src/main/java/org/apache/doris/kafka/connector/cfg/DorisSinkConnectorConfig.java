@@ -71,6 +71,15 @@ public class DorisSinkConnectorConfig {
     public static final String DORIS_USER = "doris.user";
     public static final String DORIS_PASSWORD = "doris.password";
     public static final String DORIS_DATABASE = "doris.database";
+    public static final String DORIS_ENABLE_TLS = "doris.enable.tls";
+    public static final boolean DORIS_ENABLE_TLS_DEFAULT = false;
+    public static final String DORIS_TLS_CA_CERTIFICATE_PATH = "doris.tls.ca-certificate-path";
+    public static final String DORIS_TLS_CA_CERTIFICATE_PATH_DEFAULT = "";
+    public static final String DORIS_TLS_SKIP_HOSTNAME_VERIFICATION =
+            "doris.tls.skip-hostname-verification";
+    public static final boolean DORIS_TLS_SKIP_HOSTNAME_VERIFICATION_DEFAULT = false;
+    public static final String DORIS_TLS_EXCLUDED_PROTOCOLS = "doris.tls.excluded-protocols";
+    public static final String DORIS_TLS_EXCLUDED_PROTOCOLS_DEFAULT = "";
     public static final String REQUEST_READ_TIMEOUT_MS = "request.read.timeout.ms";
     public static final String REQUEST_CONNECT_TIMEOUT_MS = "request.connect.timeout.ms";
     public static final Integer DORIS_REQUEST_READ_TIMEOUT_MS_DEFAULT = 30 * 1000;
@@ -136,6 +145,15 @@ public class DorisSinkConnectorConfig {
                 config, RETRY_INTERVAL_MS, String.valueOf(RETRY_INTERVAL_MS_DEFAULT));
         setFieldToDefaultValues(config, BEHAVIOR_ON_NULL_VALUES, BEHAVIOR_ON_NULL_VALUES_DEFAULT);
         setFieldToDefaultValues(config, ENABLE_COMBINE_FLUSH, ENABLE_COMBINE_FLUSH_DEFAULT);
+        setFieldToDefaultValues(config, DORIS_ENABLE_TLS, String.valueOf(DORIS_ENABLE_TLS_DEFAULT));
+        setFieldToDefaultValues(
+                config, DORIS_TLS_CA_CERTIFICATE_PATH, DORIS_TLS_CA_CERTIFICATE_PATH_DEFAULT);
+        setFieldToDefaultValues(
+                config,
+                DORIS_TLS_SKIP_HOSTNAME_VERIFICATION,
+                String.valueOf(DORIS_TLS_SKIP_HOSTNAME_VERIFICATION_DEFAULT));
+        setFieldToDefaultValues(
+                config, DORIS_TLS_EXCLUDED_PROTOCOLS, DORIS_TLS_EXCLUDED_PROTOCOLS_DEFAULT);
     }
 
     public static Map<String, String> convertToLowercase(Map<String, String> config) {
@@ -218,6 +236,46 @@ public class DorisSinkConnectorConfig {
                         5,
                         ConfigDef.Width.NONE,
                         DORIS_DATABASE)
+                .define(
+                        DORIS_ENABLE_TLS,
+                        Type.BOOLEAN,
+                        DORIS_ENABLE_TLS_DEFAULT,
+                        Importance.MEDIUM,
+                        "Whether to enable one-way TLS for Doris connections",
+                        DORIS_INFO,
+                        6,
+                        ConfigDef.Width.NONE,
+                        DORIS_ENABLE_TLS)
+                .define(
+                        DORIS_TLS_CA_CERTIFICATE_PATH,
+                        Type.STRING,
+                        DORIS_TLS_CA_CERTIFICATE_PATH_DEFAULT,
+                        Importance.MEDIUM,
+                        "Local path to a PEM CA certificate chain used to verify Doris",
+                        DORIS_INFO,
+                        7,
+                        ConfigDef.Width.NONE,
+                        DORIS_TLS_CA_CERTIFICATE_PATH)
+                .define(
+                        DORIS_TLS_SKIP_HOSTNAME_VERIFICATION,
+                        Type.BOOLEAN,
+                        DORIS_TLS_SKIP_HOSTNAME_VERIFICATION_DEFAULT,
+                        Importance.MEDIUM,
+                        "Whether to skip hostname verification while retaining CA verification",
+                        DORIS_INFO,
+                        8,
+                        ConfigDef.Width.NONE,
+                        DORIS_TLS_SKIP_HOSTNAME_VERIFICATION)
+                .define(
+                        DORIS_TLS_EXCLUDED_PROTOCOLS,
+                        Type.STRING,
+                        DORIS_TLS_EXCLUDED_PROTOCOLS_DEFAULT,
+                        Importance.MEDIUM,
+                        "Comma-separated Doris protocols excluded from TLS: http,mysql",
+                        DORIS_INFO,
+                        9,
+                        ConfigDef.Width.NONE,
+                        DORIS_TLS_EXCLUDED_PROTOCOLS)
                 .define(
                         TOPICS_TABLES_MAP,
                         Type.STRING,

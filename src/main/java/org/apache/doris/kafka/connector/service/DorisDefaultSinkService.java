@@ -94,6 +94,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
 
     @Override
     public void close() {
+        writer.values().forEach(DorisWriter::close);
         dorisSystemService.close();
         conn.closeConnection();
     }

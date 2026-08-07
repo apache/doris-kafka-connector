@@ -28,12 +28,14 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.connection.DorisHttpClientFactory;
 import org.apache.doris.kafka.connector.exception.CopyLoadException;
 import org.apache.doris.kafka.connector.exception.UploadException;
 import org.apache.doris.kafka.connector.model.BaseResponse;
 import org.apache.doris.kafka.connector.model.CopyIntoResp;
 import org.apache.doris.kafka.connector.model.LoadOperation;
 import org.apache.doris.kafka.connector.utils.BackoffAndRetryUtils;
+import org.apache.doris.kafka.connector.utils.DorisUrlBuilder;
 import org.apache.doris.kafka.connector.utils.HttpPostBuilder;
 import org.apache.doris.kafka.connector.utils.HttpPutBuilder;
 import org.apache.doris.kafka.connector.writer.CopySQLBuilder;
@@ -57,32 +59,42 @@ public class CopyLoad extends DataLoad {
             Pattern.compile(
                     "errCode = 2, detailMessage = No files can be copied, matched (\\d+) files, "
                             + "filtered (\\d+) files because files may be loading or loaded");
-    private static final String UPLOAD_URL_PATTERN = "http://%s/copy/upload";
-    private static final String COMMIT_PATTERN = "http://%s/copy/query";
+    private static final String UPLOAD_PATH = "/copy/upload";
+    private static final String COMMIT_PATH = "/copy/query";
     private final String loadUrlStr;
     private final String hostPort;
     private final DorisOptions dorisOptions;
-    private final CloseableHttpClient httpClient;
+    private final CloseableHttpClient dorisHttpClient;
+    private final CloseableHttpClient externalStorageHttpClient;
 
     public CopyLoad(String database, String tableName, DorisOptions dorisOptions) {
         this(
                 database,
                 tableName,
                 dorisOptions,
-                HttpClients.custom().disableRedirectHandling().build());
+                DorisHttpClientFactory.configure(
+                                HttpClients.custom().disableRedirectHandling(),
+                                dorisOptions.getTlsOptions())
+                        .build(),
+                DorisHttpClientFactory.configureSystemTrust(
+                                HttpClients.custom().disableRedirectHandling())
+                        .build());
     }
 
     public CopyLoad(
             String database,
             String tableName,
             DorisOptions dorisOptions,
-            CloseableHttpClient httpClient) {
+            CloseableHttpClient dorisHttpClient,
+            CloseableHttpClient externalStorageHttpClient) {
         this.database = database;
         this.table = tableName;
         this.hostPort = dorisOptions.getUrls() + ":" + dorisOptions.getHttpPort();
-        this.loadUrlStr = String.format(UPLOAD_URL_PATTERN, hostPort);
+        this.loadUrlStr =
+                DorisUrlBuilder.buildHttpUrl(dorisOptions.getTlsOptions(), hostPort, UPLOAD_PATH);
         this.dorisOptions = dorisOptions;
-        this.httpClient = httpClient;
+        this.dorisHttpClient = dorisHttpClient;
+        this.externalStorageHttpClient = externalStorageHttpClient;
     }
 
     public void uploadFile(String fileName, String value) {
@@ -105,13 +117,17 @@ public class CopyLoad extends DataLoad {
                     () -> {
                         HttpPostBuilder postBuilder = new HttpPostBuilder();
                         postBuilder
-                                .setUrl(String.format(COMMIT_PATTERN, hostPort))
+                                .setUrl(
+                                        DorisUrlBuilder.buildHttpUrl(
+                                                dorisOptions.getTlsOptions(),
+                                                hostPort,
+                                                COMMIT_PATH))
                                 .baseAuth(dorisOptions.getUser(), dorisOptions.getPassword())
                                 .setEntity(
                                         new StringEntity(OBJECT_MAPPER.writeValueAsString(params)));
 
                         try (CloseableHttpResponse response =
-                                httpClient.execute(postBuilder.build())) {
+                                dorisHttpClient.execute(postBuilder.build())) {
                             final int statusCode = response.getStatusLine().getStatusCode();
                             final String reasonPhrase = response.getStatusLine().getReasonPhrase();
                             String loadResult = "";
@@ -186,7 +202,7 @@ public class CopyLoad extends DataLoad {
                     () -> {
                         long start = System.currentTimeMillis();
                         try (CloseableHttpResponse response =
-                                httpClient.execute(putBuilder.build())) {
+                                externalStorageHttpClient.execute(putBuilder.build())) {
                             final int statusCode = response.getStatusLine().getStatusCode();
                             if (statusCode != 200) {
                                 String result =
@@ -224,11 +240,15 @@ public class CopyLoad extends DataLoad {
                     LoadOperation.GET_UPLOAD_ADDRESS,
                     () -> {
                         try (CloseableHttpResponse execute =
-                                httpClient.execute(putBuilder.build())) {
+                                dorisHttpClient.execute(putBuilder.build())) {
                             int statusCode = execute.getStatusLine().getStatusCode();
                             String reason = execute.getStatusLine().getReasonPhrase();
                             if (statusCode == 307) {
                                 Header location = execute.getFirstHeader("location");
+                                if (location == null) {
+                                    throw new UploadException(
+                                            "Could not get the redirected address.");
+                                }
                                 uploadAddress.set(location.getValue());
                                 LOG.info("redirect to s3:{}", uploadAddress.get());
                                 return true;
@@ -254,14 +274,21 @@ public class CopyLoad extends DataLoad {
         return uploadAddress.get();
     }
 
-    public void close() throws IOException {
-        if (null != httpClient) {
-            try {
-                httpClient.close();
-            } catch (IOException e) {
-                LOG.error("Closing httpClient failed.", e);
-                throw new RuntimeException("Closing httpClient failed.", e);
-            }
+    public void close() {
+        closeHttpClient(dorisHttpClient, "Doris");
+        if (externalStorageHttpClient != dorisHttpClient) {
+            closeHttpClient(externalStorageHttpClient, "external storage");
+        }
+    }
+
+    private void closeHttpClient(CloseableHttpClient client, String owner) {
+        if (client == null) {
+            return;
+        }
+        try {
+            client.close();
+        } catch (IOException e) {
+            LOG.warn("Failed to close {} HTTP client", owner, e);
         }
     }
 }

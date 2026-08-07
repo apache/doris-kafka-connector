@@ -54,7 +54,7 @@ public class StringMsgE2ETest extends AbstractStringE2ESinkTest {
     }
 
     public static void initialize(String connectorPath) {
-        jsonMsgConnectorContent = loadContent(connectorPath);
+        jsonMsgConnectorContent = configureDorisConnector(loadContent(connectorPath));
         JsonNode rootNode = null;
         try {
             rootNode = objectMapper.readTree(jsonMsgConnectorContent);

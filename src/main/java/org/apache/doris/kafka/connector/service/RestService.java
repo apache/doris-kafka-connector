@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -38,6 +39,7 @@ import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.IOUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.connection.DorisHttpClientFactory;
 import org.apache.doris.kafka.connector.exception.ConnectedFailedException;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.exception.SchemaChangeException;
@@ -45,6 +47,7 @@ import org.apache.doris.kafka.connector.model.BackendV2;
 import org.apache.doris.kafka.connector.model.LoadOperation;
 import org.apache.doris.kafka.connector.model.doris.Schema;
 import org.apache.doris.kafka.connector.utils.BackoffAndRetryUtils;
+import org.apache.doris.kafka.connector.utils.DorisUrlBuilder;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.config.RequestConfig;
@@ -54,14 +57,13 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 
 public class RestService {
 
     private static final String BACKENDS_V2 = "/api/backends?is_alive=true";
-    private static final String TABLE_SCHEMA_API = "http://%s/api/%s/%s/_schema";
+    private static final String TABLE_SCHEMA_API = "/api/%s/%s/_schema";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String UNIQUE_KEYS_TYPE = "UNIQUE_KEYS";
 
@@ -81,7 +83,8 @@ public class RestService {
 
         for (String feNode : feNodeList) {
             try {
-                String beUrl = "http://" + feNode + BACKENDS_V2;
+                String beUrl =
+                        DorisUrlBuilder.buildHttpUrl(options.getTlsOptions(), feNode, BACKENDS_V2);
                 HttpGet httpGet = new HttpGet(beUrl);
                 String response = send(options, httpGet, logger);
                 logger.info("Backend Info:{}", response);
@@ -167,6 +170,7 @@ public class RestService {
                                                 request,
                                                 options.getUser(),
                                                 options.getPassword(),
+                                                options,
                                                 logger);
                             } else {
                                 response =
@@ -174,6 +178,7 @@ public class RestService {
                                                 request,
                                                 options.getUser(),
                                                 options.getPassword(),
+                                                options,
                                                 logger);
                             }
                             if (Objects.isNull(response)) {
@@ -219,48 +224,70 @@ public class RestService {
     }
 
     private static String getConnectionGet(
-            HttpRequestBase request, String user, String passwd, Logger logger) throws IOException {
+            HttpRequestBase request,
+            String user,
+            String passwd,
+            DorisOptions options,
+            Logger logger)
+            throws IOException {
         URL realUrl = new URL(request.getURI().toString());
         // open connection
-        HttpURLConnection connection = (HttpURLConnection) realUrl.openConnection();
-        String authEncoding =
-                Base64.getEncoder()
-                        .encodeToString(
-                                String.format("%s:%s", user, passwd)
-                                        .getBytes(StandardCharsets.UTF_8));
-        connection.setRequestProperty("Authorization", "Basic " + authEncoding);
+        HttpURLConnection connection =
+                DorisHttpClientFactory.openConnection(realUrl, options.getTlsOptions());
+        try {
+            String authEncoding =
+                    Base64.getEncoder()
+                            .encodeToString(
+                                    String.format("%s:%s", user, passwd)
+                                            .getBytes(StandardCharsets.UTF_8));
+            connection.setRequestProperty("Authorization", "Basic " + authEncoding);
 
-        connection.connect();
-        connection.setConnectTimeout(request.getConfig().getConnectTimeout());
-        connection.setReadTimeout(request.getConfig().getSocketTimeout());
-        return parseResponse(connection, logger);
+            connection.setConnectTimeout(request.getConfig().getConnectTimeout());
+            connection.setReadTimeout(request.getConfig().getSocketTimeout());
+            connection.connect();
+            return parseResponse(connection, logger);
+        } finally {
+            connection.disconnect();
+        }
     }
 
     private static String getConnectionPost(
-            HttpRequestBase request, String user, String passwd, Logger logger) throws IOException {
+            HttpRequestBase request,
+            String user,
+            String passwd,
+            DorisOptions options,
+            Logger logger)
+            throws IOException {
         URL url = new URL(request.getURI().toString());
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setInstanceFollowRedirects(false);
-        conn.setRequestMethod(request.getMethod());
-        String authEncoding =
-                Base64.getEncoder()
-                        .encodeToString(
-                                String.format("%s:%s", user, passwd)
-                                        .getBytes(StandardCharsets.UTF_8));
-        conn.setRequestProperty("Authorization", "Basic " + authEncoding);
-        InputStream content = ((HttpPost) request).getEntity().getContent();
-        String res = IOUtils.toString(content);
-        conn.setDoOutput(true);
-        conn.setDoInput(true);
-        conn.setConnectTimeout(request.getConfig().getConnectTimeout());
-        conn.setReadTimeout(request.getConfig().getSocketTimeout());
-        PrintWriter out = new PrintWriter(conn.getOutputStream());
-        // send request params
-        out.print(res);
-        // flush
-        out.flush();
-        // read response
-        return parseResponse(conn, logger);
+        HttpURLConnection conn =
+                DorisHttpClientFactory.openConnection(url, options.getTlsOptions());
+        try {
+            conn.setInstanceFollowRedirects(false);
+            conn.setRequestMethod(request.getMethod());
+            String authEncoding =
+                    Base64.getEncoder()
+                            .encodeToString(
+                                    String.format("%s:%s", user, passwd)
+                                            .getBytes(StandardCharsets.UTF_8));
+            conn.setRequestProperty("Authorization", "Basic " + authEncoding);
+            String res;
+            try (InputStream content = ((HttpPost) request).getEntity().getContent()) {
+                res = IOUtils.toString(content, StandardCharsets.UTF_8);
+            }
+            conn.setDoOutput(true);
+            conn.setDoInput(true);
+            conn.setConnectTimeout(request.getConfig().getConnectTimeout());
+            conn.setReadTimeout(request.getConfig().getSocketTimeout());
+            try (PrintWriter out =
+                    new PrintWriter(
+                            new OutputStreamWriter(
+                                    conn.getOutputStream(), StandardCharsets.UTF_8))) {
+                out.print(res);
+            }
+            return parseResponse(conn, logger);
+        } finally {
+            conn.disconnect();
+        }
     }
 
     private static String parseResponse(HttpURLConnection connection, Logger logger)
@@ -316,10 +343,13 @@ public class RestService {
         Object responseData = null;
         try {
             String tableSchemaUri =
-                    String.format(TABLE_SCHEMA_API, dorisOptions.getHttpUrl(), db, table);
+                    DorisUrlBuilder.buildHttpUrl(
+                            dorisOptions.getTlsOptions(),
+                            dorisOptions.getHttpUrl(),
+                            String.format(TABLE_SCHEMA_API, db, table));
             HttpGet httpGet = new HttpGet(tableSchemaUri);
             httpGet.setHeader(HttpHeaders.AUTHORIZATION, authHeader(dorisOptions));
-            Map<String, Object> responseMap = handleResponse(httpGet, logger);
+            Map<String, Object> responseMap = handleResponse(httpGet, dorisOptions, logger);
             responseData = responseMap.get("data");
             String schemaStr = OBJECT_MAPPER.writeValueAsString(responseData);
             return OBJECT_MAPPER.readValue(schemaStr, Schema.class);
@@ -336,24 +366,27 @@ public class RestService {
                                         .getBytes(StandardCharsets.UTF_8)));
     }
 
-    private static Map handleResponse(HttpUriRequest request, Logger logger) {
-        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
-            CloseableHttpResponse response = httpclient.execute(request);
-            final int statusCode = response.getStatusLine().getStatusCode();
-            final String reasonPhrase = response.getStatusLine().getReasonPhrase();
-            if (statusCode == 200 && response.getEntity() != null) {
-                String responseEntity = EntityUtils.toString(response.getEntity());
-                return OBJECT_MAPPER.readValue(responseEntity, Map.class);
-            } else {
-                throw new SchemaChangeException(
-                        "Failed to schemaChange, status: "
-                                + statusCode
-                                + ", reason: "
-                                + reasonPhrase);
+    private static Map handleResponse(
+            HttpUriRequest request, DorisOptions dorisOptions, Logger logger) {
+        try (CloseableHttpClient httpclient =
+                DorisHttpClientFactory.create(dorisOptions.getTlsOptions())) {
+            try (CloseableHttpResponse response = httpclient.execute(request)) {
+                final int statusCode = response.getStatusLine().getStatusCode();
+                final String reasonPhrase = response.getStatusLine().getReasonPhrase();
+                if (statusCode == 200 && response.getEntity() != null) {
+                    String responseEntity = EntityUtils.toString(response.getEntity());
+                    return OBJECT_MAPPER.readValue(responseEntity, Map.class);
+                } else {
+                    throw new SchemaChangeException(
+                            "Failed to schemaChange, status: "
+                                    + statusCode
+                                    + ", reason: "
+                                    + reasonPhrase);
+                }
             }
         } catch (Exception e) {
             logger.trace("SchemaChange request error,", e);
-            throw new SchemaChangeException("SchemaChange request error with " + e.getMessage());
+            throw new SchemaChangeException("SchemaChange request error with " + e.getMessage(), e);
         }
     }
 }

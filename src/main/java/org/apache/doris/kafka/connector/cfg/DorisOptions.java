@@ -71,6 +71,7 @@ public class DorisOptions {
     private final int retryIntervalMs;
     private final BehaviorOnNullValues behaviorOnNullValues;
     private final boolean enableCombineFlush;
+    private final DorisTlsOptions tlsOptions;
 
     public DorisOptions(Map<String, String> config) {
         this.name = config.get(DorisSinkConnectorConfig.NAME);
@@ -155,6 +156,34 @@ public class DorisOptions {
         this.behaviorOnNullValues =
                 BehaviorOnNullValues.of(
                         config.get(DorisSinkConnectorConfig.BEHAVIOR_ON_NULL_VALUES));
+        this.tlsOptions =
+                DorisTlsOptions.builder()
+                        .setEnabled(
+                                Boolean.parseBoolean(
+                                        config.getOrDefault(
+                                                DorisSinkConnectorConfig.DORIS_ENABLE_TLS,
+                                                String.valueOf(
+                                                        DorisSinkConnectorConfig
+                                                                .DORIS_ENABLE_TLS_DEFAULT))))
+                        .setCaCertificatePath(
+                                config.getOrDefault(
+                                        DorisSinkConnectorConfig.DORIS_TLS_CA_CERTIFICATE_PATH,
+                                        DorisSinkConnectorConfig
+                                                .DORIS_TLS_CA_CERTIFICATE_PATH_DEFAULT))
+                        .setSkipHostnameVerification(
+                                Boolean.parseBoolean(
+                                        config.getOrDefault(
+                                                DorisSinkConnectorConfig
+                                                        .DORIS_TLS_SKIP_HOSTNAME_VERIFICATION,
+                                                String.valueOf(
+                                                        DorisSinkConnectorConfig
+                                                                .DORIS_TLS_SKIP_HOSTNAME_VERIFICATION_DEFAULT))))
+                        .setExcludedProtocols(
+                                config.getOrDefault(
+                                        DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS,
+                                        DorisSinkConnectorConfig
+                                                .DORIS_TLS_EXCLUDED_PROTOCOLS_DEFAULT))
+                        .build();
     }
 
     private Properties getStreamLoadPropFromConfig(Map<String, String> config) {
@@ -356,6 +385,10 @@ public class DorisOptions {
 
     public int getRetryIntervalMs() {
         return retryIntervalMs;
+    }
+
+    public DorisTlsOptions getTlsOptions() {
+        return tlsOptions;
     }
 
     public BehaviorOnNullValues getBehaviorOnNullValues() {

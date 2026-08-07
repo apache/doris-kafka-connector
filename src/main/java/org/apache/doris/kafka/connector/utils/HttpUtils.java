@@ -19,22 +19,27 @@
 
 package org.apache.doris.kafka.connector.utils;
 
+import org.apache.doris.kafka.connector.cfg.DorisTlsOptions;
+import org.apache.doris.kafka.connector.connection.DorisHttpClientFactory;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.DefaultRedirectStrategy;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 
 /** util to build http client. */
 public class HttpUtils {
-    private final HttpClientBuilder httpClientBuilder =
-            HttpClients.custom()
-                    .setRedirectStrategy(
-                            new DefaultRedirectStrategy() {
-                                @Override
-                                protected boolean isRedirectable(String method) {
-                                    return true;
-                                }
-                            });
+    private final HttpClientBuilder httpClientBuilder;
+
+    public HttpUtils() {
+        this(DorisTlsOptions.disabled());
+    }
+
+    public HttpUtils(DorisTlsOptions tlsOptions) {
+        this.httpClientBuilder =
+                DorisHttpClientFactory.configure(
+                        HttpClients.custom()
+                                .setRedirectStrategy(new DorisRedirectStrategy(tlsOptions)),
+                        tlsOptions);
+    }
 
     public CloseableHttpClient getHttpClient() {
         return httpClientBuilder.build();
