@@ -30,16 +30,17 @@ import java.util.Map;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.connection.DorisHttpClientFactory;
 import org.apache.doris.kafka.connector.converter.RecordDescriptor;
 import org.apache.doris.kafka.connector.exception.SchemaChangeException;
 import org.apache.doris.kafka.connector.service.DorisSystemService;
+import org.apache.doris.kafka.connector.utils.DorisUrlBuilder;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,7 @@ public class SchemaChangeManager implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(SchemaChangeManager.class);
     private static final String ADD_DDL = "ALTER TABLE %s ADD COLUMN %s %s";
-    private static final String SCHEMA_CHANGE_API = "http://%s/api/query/default_cluster/%s";
+    private static final String SCHEMA_CHANGE_API = "/api/query/default_cluster/%s";
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final DorisOptions dorisOptions;
     private DorisSystemService dorisSystemService;
@@ -153,7 +154,11 @@ public class SchemaChangeManager implements Serializable {
             throws IllegalArgumentException, IOException {
         Map<String, String> param = new HashMap<>();
         param.put("stmt", ddl);
-        String requestUrl = String.format(SCHEMA_CHANGE_API, dorisOptions.getHttpUrl(), database);
+        String requestUrl =
+                DorisUrlBuilder.buildHttpUrl(
+                        dorisOptions.getTlsOptions(),
+                        dorisOptions.getHttpUrl(),
+                        String.format(SCHEMA_CHANGE_API, database));
         HttpPost httpPost = new HttpPost(requestUrl);
         httpPost.setHeader(HttpHeaders.AUTHORIZATION, authHeader());
         httpPost.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
@@ -162,23 +167,25 @@ public class SchemaChangeManager implements Serializable {
     }
 
     private Map<String, Object> handleResponse(HttpUriRequest request, String responseEntity) {
-        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
-            CloseableHttpResponse response = httpclient.execute(request);
-            final int statusCode = response.getStatusLine().getStatusCode();
-            final String reasonPhrase = response.getStatusLine().getReasonPhrase();
-            if (statusCode == HTTP_OK && response.getEntity() != null) {
-                responseEntity = EntityUtils.toString(response.getEntity());
-                return objectMapper.readValue(responseEntity, Map.class);
-            } else {
-                throw new SchemaChangeException(
-                        "Failed to schemaChange, status: "
-                                + statusCode
-                                + ", reason: "
-                                + reasonPhrase);
+        try (CloseableHttpClient httpclient =
+                DorisHttpClientFactory.create(dorisOptions.getTlsOptions())) {
+            try (CloseableHttpResponse response = httpclient.execute(request)) {
+                final int statusCode = response.getStatusLine().getStatusCode();
+                final String reasonPhrase = response.getStatusLine().getReasonPhrase();
+                if (statusCode == HTTP_OK && response.getEntity() != null) {
+                    responseEntity = EntityUtils.toString(response.getEntity());
+                    return objectMapper.readValue(responseEntity, Map.class);
+                } else {
+                    throw new SchemaChangeException(
+                            "Failed to schemaChange, status: "
+                                    + statusCode
+                                    + ", reason: "
+                                    + reasonPhrase);
+                }
             }
         } catch (Exception e) {
             LOG.error("SchemaChange request error,", e);
-            throw new SchemaChangeException("SchemaChange request error with " + e.getMessage());
+            throw new SchemaChangeException("SchemaChange request error with " + e.getMessage(), e);
         }
     }
 

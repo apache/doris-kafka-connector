@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.LockSupport;
+import org.apache.doris.kafka.connector.cfg.DorisTlsOptions;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,6 +108,41 @@ public class DorisContainerServiceImpl implements DorisContainerService {
     @Override
     public String getInstanceHost() {
         return dorisContainer.getHost();
+    }
+
+    @Override
+    public int getHttpPort() {
+        return 8030;
+    }
+
+    @Override
+    public int getQueryPort() {
+        return 9030;
+    }
+
+    @Override
+    public String getUsername() {
+        return USERNAME;
+    }
+
+    @Override
+    public String getPassword() {
+        return PASSWORD;
+    }
+
+    @Override
+    public DorisTlsOptions getTlsOptions() {
+        return DorisTlsOptions.disabled();
+    }
+
+    @Override
+    public Connection getQueryConnection() {
+        try {
+            return DriverManager.getConnection(
+                    String.format(JDBC_URL, dorisContainer.getHost()), USERNAME, PASSWORD);
+        } catch (SQLException e) {
+            throw new DorisException("Failed to connect to Doris", e);
+        }
     }
 
     public void close() {

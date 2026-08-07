@@ -20,6 +20,7 @@
 package org.apache.doris.kafka.connector.e2e.sink;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -39,8 +39,11 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.doris.kafka.connector.cfg.DorisTlsOptions;
 import org.apache.doris.kafka.connector.e2e.doris.DorisContainerService;
 import org.apache.doris.kafka.connector.e2e.doris.DorisContainerServiceImpl;
+import org.apache.doris.kafka.connector.e2e.doris.DorisCustomerServiceImpl;
 import org.apache.doris.kafka.connector.e2e.kafka.KafkaContainerService;
 import org.apache.doris.kafka.connector.e2e.kafka.KafkaContainerServiceImpl;
 import org.apache.doris.kafka.connector.exception.DorisException;
@@ -60,10 +63,6 @@ public abstract class AbstractKafka2DorisSink {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractKafka2DorisSink.class);
     protected static final String NAME = "name";
     protected static final String CONFIG = "config";
-    private static final String JDBC_URL = "jdbc:mysql://%s:9030";
-    private static final String USERNAME = "root";
-    private static final String PASSWORD = "";
-    private static String dorisInstanceHost;
     protected static String kafkaInstanceHostAndPort;
     protected static KafkaContainerService kafkaContainerService;
     protected static ObjectMapper objectMapper = new ObjectMapper();
@@ -97,12 +96,7 @@ public abstract class AbstractKafka2DorisSink {
     }
 
     protected static Connection getJdbcConnection() {
-        try {
-            return DriverManager.getConnection(
-                    String.format(JDBC_URL, dorisInstanceHost), USERNAME, PASSWORD);
-        } catch (SQLException e) {
-            throw new DorisException(e);
-        }
+        return dorisContainerService.getQueryConnection();
     }
 
     protected static String loadContent(String path) {
@@ -170,9 +164,47 @@ public abstract class AbstractKafka2DorisSink {
         if (Objects.nonNull(dorisContainerService)) {
             return;
         }
-        dorisContainerService = new DorisContainerServiceImpl();
+        dorisContainerService =
+                Boolean.parseBoolean(
+                                System.getProperty(DorisCustomerServiceImpl.CUSTOMER_ENV, "false"))
+                        ? new DorisCustomerServiceImpl()
+                        : new DorisContainerServiceImpl();
         dorisContainerService.startContainer();
-        dorisInstanceHost = dorisContainerService.getInstanceHost();
+    }
+
+    protected static String configureDorisConnector(String content) {
+        try {
+            ObjectNode root = (ObjectNode) objectMapper.readTree(content);
+            ObjectNode config = (ObjectNode) root.get(CONFIG);
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_URLS, dorisContainerService.getInstanceHost());
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_HTTP_PORT,
+                    String.valueOf(dorisContainerService.getHttpPort()));
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_QUERY_PORT,
+                    String.valueOf(dorisContainerService.getQueryPort()));
+            config.put(DorisSinkConnectorConfig.DORIS_USER, dorisContainerService.getUsername());
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_PASSWORD, dorisContainerService.getPassword());
+
+            DorisTlsOptions tlsOptions = dorisContainerService.getTlsOptions();
+            config.put(DorisSinkConnectorConfig.DORIS_ENABLE_TLS, tlsOptions.isEnabled());
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_TLS_CA_CERTIFICATE_PATH,
+                    tlsOptions.getCaCertificatePath());
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_TLS_SKIP_HOSTNAME_VERIFICATION,
+                    tlsOptions.isSkipHostnameVerification());
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS,
+                    tlsOptions.getExcludedProtocols().stream()
+                            .map(protocol -> protocol.name().toLowerCase())
+                            .collect(Collectors.joining(",")));
+            return objectMapper.writeValueAsString(root);
+        } catch (IOException e) {
+            throw new DorisException("Failed to configure the Doris E2E environment", e);
+        }
     }
 
     @AfterClass
@@ -213,7 +245,9 @@ public abstract class AbstractKafka2DorisSink {
                         "http://%s:%s/api/debug_point/add/%s",
                         dorisContainerService.getInstanceHost(), 8040, pointName);
         HttpPost httpPost = new HttpPost(apiUrl);
-        httpPost.addHeader(HttpHeaders.AUTHORIZATION, auth(USERNAME, PASSWORD));
+        httpPost.addHeader(
+                HttpHeaders.AUTHORIZATION,
+                auth(dorisContainerService.getUsername(), dorisContainerService.getPassword()));
         try (CloseableHttpClient httpClient = HttpClients.custom().build()) {
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
@@ -233,7 +267,9 @@ public abstract class AbstractKafka2DorisSink {
                         "http://%s:%s/api/debug_point/clear",
                         dorisContainerService.getInstanceHost(), 8040);
         HttpPost httpPost = new HttpPost(apiUrl);
-        httpPost.addHeader(HttpHeaders.AUTHORIZATION, auth(USERNAME, PASSWORD));
+        httpPost.addHeader(
+                HttpHeaders.AUTHORIZATION,
+                auth(dorisContainerService.getUsername(), dorisContainerService.getPassword()));
         try (CloseableHttpClient httpClient = HttpClients.custom().build()) {
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();

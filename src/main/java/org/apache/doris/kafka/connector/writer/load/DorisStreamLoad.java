@@ -30,6 +30,7 @@ import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.exception.StreamLoadException;
 import org.apache.doris.kafka.connector.model.KafkaRespContent;
 import org.apache.doris.kafka.connector.utils.BackendUtils;
+import org.apache.doris.kafka.connector.utils.DorisUrlBuilder;
 import org.apache.doris.kafka.connector.utils.HttpPutBuilder;
 import org.apache.doris.kafka.connector.utils.HttpUtils;
 import org.apache.doris.kafka.connector.writer.LoadConstants;
@@ -45,14 +46,14 @@ import org.slf4j.LoggerFactory;
 
 public class DorisStreamLoad extends DataLoad {
     private static final Logger LOG = LoggerFactory.getLogger(DorisStreamLoad.class);
-    private static final String LOAD_URL_PATTERN = "http://%s/api/%s/%s/_stream_load";
+    private static final String LOAD_PATH_PATTERN = "/api/%s/%s/_stream_load";
     private static final List<String> DORIS_SUCCESS_STATUS =
             new ArrayList<>(Arrays.asList(LoadStatus.SUCCESS, LoadStatus.PUBLISH_TIMEOUT));
     private String loadUrl;
     private final DorisOptions dorisOptions;
     private final String topic;
     private String hostPort;
-    private final CloseableHttpClient httpClient = new HttpUtils().getHttpClient();
+    private final CloseableHttpClient httpClient;
     private final BackendUtils backendUtils;
     private Queue<KafkaRespContent> respContents = new LinkedList<>();
     private final boolean enableGroupCommit;
@@ -60,14 +61,28 @@ public class DorisStreamLoad extends DataLoad {
 
     public DorisStreamLoad(
             BackendUtils backendUtils, DorisOptions dorisOptions, String topic, String table) {
+        this(
+                backendUtils,
+                dorisOptions,
+                topic,
+                table,
+                new HttpUtils(dorisOptions.getTlsOptions()).getHttpClient());
+    }
+
+    public DorisStreamLoad(
+            BackendUtils backendUtils,
+            DorisOptions dorisOptions,
+            String topic,
+            String table,
+            CloseableHttpClient httpClient) {
         this.database = dorisOptions.getDatabase();
         this.table = table;
         this.user = dorisOptions.getUser();
         this.password = dorisOptions.getPassword();
-        this.loadUrl = String.format(LOAD_URL_PATTERN, hostPort, database, table);
         this.dorisOptions = dorisOptions;
         this.backendUtils = backendUtils;
         this.topic = topic;
+        this.httpClient = httpClient;
         this.enableGroupCommit = dorisOptions.enableGroupCommit();
         this.enableGzCompress =
                 LoadConstants.COMPRESS_TYPE_GZ.equals(
@@ -152,8 +167,20 @@ public class DorisStreamLoad extends DataLoad {
         return hostPort;
     }
 
+    public void close() {
+        try {
+            httpClient.close();
+        } catch (IOException e) {
+            LOG.warn("Failed to close Doris stream load HTTP client", e);
+        }
+    }
+
     private void refreshLoadUrl(String database, String table) {
         hostPort = backendUtils.getAvailableBackend();
-        loadUrl = String.format(LOAD_URL_PATTERN, hostPort, database, table);
+        loadUrl =
+                DorisUrlBuilder.buildHttpUrl(
+                        dorisOptions.getTlsOptions(),
+                        hostPort,
+                        String.format(LOAD_PATH_PATTERN, database, table));
     }
 }

@@ -114,6 +114,26 @@ public class TestDorisSinkConnectorConfig {
         ConfigCheckUtils.validateConfig(config);
     }
 
+    @Test
+    public void testTlsDefaults() {
+        Map<String, String> config = getConfig();
+
+        Assert.assertEquals("false", config.get(DorisSinkConnectorConfig.DORIS_ENABLE_TLS));
+        Assert.assertEquals("", config.get(DorisSinkConnectorConfig.DORIS_TLS_CA_CERTIFICATE_PATH));
+        Assert.assertEquals(
+                "false", config.get(DorisSinkConnectorConfig.DORIS_TLS_SKIP_HOSTNAME_VERIFICATION));
+        Assert.assertEquals("", config.get(DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS));
+    }
+
+    @Test(expected = DorisException.class)
+    public void testUnknownTlsExcludedProtocol() {
+        Map<String, String> config = getConfig();
+        config.put(DorisSinkConnectorConfig.DORIS_ENABLE_TLS, "true");
+        config.put(DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS, "thrift");
+
+        ConfigCheckUtils.validateConfig(config);
+    }
+
     @Test(expected = DorisException.class)
     public void testEmptyName() {
         Map<String, String> config = getConfig();

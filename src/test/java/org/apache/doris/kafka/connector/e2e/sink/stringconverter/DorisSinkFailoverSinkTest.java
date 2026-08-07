@@ -33,8 +33,10 @@ import java.util.Objects;
 import java.util.StringJoiner;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.doris.kafka.connector.e2e.doris.DorisCustomerServiceImpl;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.utils.ConfigCheckUtils;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -50,6 +52,10 @@ public class DorisSinkFailoverSinkTest extends AbstractStringE2ESinkTest {
 
     @BeforeClass
     public static void setUp() {
+        Assume.assumeFalse(
+                "Failover fault injection requires the local Doris container",
+                Boolean.parseBoolean(
+                        System.getProperty(DorisCustomerServiceImpl.CUSTOMER_ENV, "false")));
         initServer();
         initProducer();
     }

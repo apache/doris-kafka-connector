@@ -174,4 +174,9 @@ public class CopyIntoWriter extends DorisWriter {
     public void setCopyLoad(CopyLoad copyLoad) {
         this.copyLoad = copyLoad;
     }
+
+    @Override
+    public void close() {
+        copyLoad.close();
+    }
 }

@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.cfg.DorisTlsOptions;
+import org.apache.doris.kafka.connector.connection.DorisHttpClientFactory;
 import org.apache.doris.kafka.connector.exception.DorisException;
 import org.apache.doris.kafka.connector.model.BackendV2;
 import org.apache.doris.kafka.connector.service.RestService;
@@ -38,17 +40,24 @@ public class BackendUtils {
     private static final long PROBE_CACHE_TTL_MS = 5_000L;
 
     private final List<BackendV2.BackendRowV2> backends;
+    private final DorisTlsOptions tlsOptions;
     private long pos;
     /** backend -> last successful probe time (nanos). */
     private final Map<String, Long> aliveProbeAtNanos = new HashMap<>();
 
     public BackendUtils(List<BackendV2.BackendRowV2> backends) {
+        this(backends, DorisTlsOptions.disabled());
+    }
+
+    public BackendUtils(List<BackendV2.BackendRowV2> backends, DorisTlsOptions tlsOptions) {
         this.backends = backends;
+        this.tlsOptions = tlsOptions;
         this.pos = 0;
     }
 
     public static BackendUtils getInstance(DorisOptions dorisOptions, Logger logger) {
-        return new BackendUtils(RestService.getBackendsV2(dorisOptions, logger));
+        return new BackendUtils(
+                RestService.getBackendsV2(dorisOptions, logger), dorisOptions.getTlsOptions());
     }
 
     /**
@@ -63,7 +72,7 @@ public class BackendUtils {
             if (isRecentlyAlive(res)) {
                 return res;
             }
-            if (tryHttpConnection(res)) {
+            if (tryHttpConnection(res, tlsOptions)) {
                 aliveProbeAtNanos.put(res, System.nanoTime());
                 return res;
             }
@@ -93,17 +102,26 @@ public class BackendUtils {
     }
 
     public static boolean tryHttpConnection(String backend) {
+        return tryHttpConnection(backend, DorisTlsOptions.disabled());
+    }
+
+    public static boolean tryHttpConnection(String backend, DorisTlsOptions tlsOptions) {
+        HttpURLConnection connection = null;
         try {
-            backend = "http://" + backend;
-            URL url = new URL(backend);
-            HttpURLConnection co = (HttpURLConnection) url.openConnection();
-            co.setConnectTimeout(60000);
-            co.connect();
-            co.disconnect();
+            String backendUrl = DorisUrlBuilder.buildHttpUrl(tlsOptions, backend, "/");
+            URL url = new URL(backendUrl);
+            connection = DorisHttpClientFactory.openConnection(url, tlsOptions);
+            connection.setConnectTimeout(60000);
+            connection.setReadTimeout(60000);
+            connection.connect();
             return true;
         } catch (Exception ex) {
             LOG.warn("Failed to connect to backend:{}", backend, ex);
             return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
     }
 }

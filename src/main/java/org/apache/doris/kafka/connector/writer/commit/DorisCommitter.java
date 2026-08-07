@@ -21,6 +21,7 @@ package org.apache.doris.kafka.connector.writer.commit;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.doris.kafka.connector.exception.StreamLoadException;
 import org.apache.doris.kafka.connector.model.LoadOperation;
 import org.apache.doris.kafka.connector.utils.BackendUtils;
 import org.apache.doris.kafka.connector.utils.BackoffAndRetryUtils;
+import org.apache.doris.kafka.connector.utils.DorisUrlBuilder;
 import org.apache.doris.kafka.connector.utils.HttpPutBuilder;
 import org.apache.doris.kafka.connector.utils.HttpUtils;
 import org.apache.doris.kafka.connector.writer.LoadStatus;
@@ -44,15 +46,24 @@ import org.slf4j.LoggerFactory;
 
 public class DorisCommitter {
     private static final Logger LOG = LoggerFactory.getLogger(DorisCommitter.class);
-    private static final String COMMIT_PATTERN = "http://%s/api/%s/_stream_load_2pc";
+    private static final String COMMIT_PATH_PATTERN = "/api/%s/_stream_load_2pc";
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final CloseableHttpClient httpClient = new HttpUtils().getHttpClient();
+    private final CloseableHttpClient httpClient;
     private final BackendUtils backendUtils;
     private final DorisOptions dorisOptions;
 
     public DorisCommitter(DorisOptions dorisOptions, BackendUtils backendUtils) {
+        this(
+                dorisOptions,
+                backendUtils,
+                new HttpUtils(dorisOptions.getTlsOptions()).getHttpClient());
+    }
+
+    public DorisCommitter(
+            DorisOptions dorisOptions, BackendUtils backendUtils, CloseableHttpClient httpClient) {
         this.backendUtils = backendUtils;
         this.dorisOptions = dorisOptions;
+        this.httpClient = httpClient;
     }
 
     public void commit(List<DorisCommittable> dorisCommittables) {
@@ -82,7 +93,10 @@ public class DorisCommitter {
                         LOG.info(
                                 "commit txn {} to host {}", committable.getTxnID(), hostPort.get());
                         String url =
-                                String.format(COMMIT_PATTERN, hostPort.get(), committable.getDb());
+                                DorisUrlBuilder.buildHttpUrl(
+                                        dorisOptions.getTlsOptions(),
+                                        hostPort.get(),
+                                        String.format(COMMIT_PATH_PATTERN, committable.getDb()));
                         HttpPut httpPut = builder.setUrl(url).setEmptyEntity().build();
 
                         // http execute...
@@ -129,6 +143,14 @@ public class DorisCommitter {
         } catch (Exception e) {
             LOG.error("commit transaction error:", e);
             throw new StreamLoadException("commit transaction error: " + e);
+        }
+    }
+
+    public void close() {
+        try {
+            httpClient.close();
+        } catch (IOException e) {
+            LOG.warn("Failed to close Doris committer HTTP client", e);
         }
     }
 }

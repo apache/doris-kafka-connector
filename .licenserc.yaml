@@ -27,5 +27,6 @@ header:
     - 'config/archive/**'
     - 'src/test/resources/decode/avro/**'
     - 'src/test/resources/e2e/**'
+    - 'src/test/resources/tls/**'
 
   comment: on-failure

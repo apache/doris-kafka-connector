@@ -30,6 +30,10 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.doris.kafka.connector.exception.UploadException;
+import org.apache.doris.kafka.connector.testutil.DorisOptionsTestUtils;
+import org.apache.doris.kafka.connector.testutil.HttpsTestServer;
+import org.apache.doris.kafka.connector.testutil.RecordingHttpClient;
 import org.apache.doris.kafka.connector.writer.load.CopyLoad;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -62,8 +66,70 @@ public class TestCopyLoad {
                         + ",\"id\":\"7f590a04139949f6-aa8b38048974da1f\",\"state\":\"FINISHED\",\"type\":\"\",\"filterRows\":\"0\",\"unselectRows\":\"0\",\"url\":null},\"time\":5020,\"type\":\"result_set\"},\"count\":0}";
         CloseableHttpResponse copyQueryResponse = HttpTestUtil.getResponse(response, true, false);
         when(httpClient.execute(any())).thenReturn(copyQueryResponse);
-        CopyLoad copyLoad = new CopyLoad(options.getDatabase(), "test_kafka", options, httpClient);
-        boolean file = copyLoad.executeCopy(Arrays.asList("file", "file2"));
-        Assert.assertEquals(true, file);
+        CloseableHttpClient storageClient = mock(CloseableHttpClient.class);
+        CopyLoad copyLoad =
+                new CopyLoad(
+                        options.getDatabase(), "test_kafka", options, httpClient, storageClient);
+        try {
+            boolean file = copyLoad.executeCopy(Arrays.asList("file", "file2"));
+            Assert.assertEquals(true, file);
+        } finally {
+            copyLoad.close();
+        }
+    }
+
+    @Test
+    public void testCopyUsesSeparateDorisAndStorageClients() throws Exception {
+        DorisOptions tlsOptions = DorisOptionsTestUtils.tlsOptions("fe", 8030);
+        RecordingHttpClient dorisClient = new RecordingHttpClient();
+        RecordingHttpClient storageClient = new RecordingHttpClient();
+        dorisClient.addResponse(307, null, "https://storage.example/upload");
+        storageClient.addResponse(200, null);
+        CopyLoad copyLoad = new CopyLoad("db", "table", tlsOptions, dorisClient, storageClient);
+
+        copyLoad.uploadFile("file.json", "{\"id\":1}");
+
+        Assert.assertEquals("https://fe:8030/copy/upload", dorisClient.getLastRequestUri());
+        Assert.assertEquals("https://storage.example/upload", storageClient.getLastRequestUri());
+
+        copyLoad.close();
+        Assert.assertTrue(dorisClient.isClosed());
+        Assert.assertTrue(storageClient.isClosed());
+    }
+
+    @Test
+    public void testTlsCopyAllowsPlaintextStorageLocation() throws Exception {
+        DorisOptions tlsOptions = DorisOptionsTestUtils.tlsOptions("fe", 8030);
+        RecordingHttpClient dorisClient = new RecordingHttpClient();
+        RecordingHttpClient storageClient = new RecordingHttpClient();
+        dorisClient.addResponse(307, null, "http://storage.example/upload");
+        storageClient.addResponse(200, null);
+        CopyLoad copyLoad = new CopyLoad("db", "table", tlsOptions, dorisClient, storageClient);
+
+        try {
+            copyLoad.uploadFile("file.json", "{\"id\":1}");
+            Assert.assertEquals("http://storage.example/upload", storageClient.getLastRequestUri());
+        } finally {
+            copyLoad.close();
+        }
+    }
+
+    @Test
+    public void testExternalStorageClientDoesNotTrustDorisPrivateCa() throws Exception {
+        try (HttpsTestServer server = new HttpsTestServer()) {
+            server.redirectPathTo(
+                    "/copy/upload", server.getUrl("localhost") + "external-storage/upload");
+            DorisOptions tlsOptions =
+                    DorisOptionsTestUtils.tlsOptions("localhost", server.getPort());
+            CopyLoad copyLoad = new CopyLoad("db", "table", tlsOptions);
+            try {
+                copyLoad.uploadFile("file.json", "{\"id\":1}");
+                Assert.fail("External storage client must not inherit the Doris private CA");
+            } catch (UploadException expected) {
+                Assert.assertEquals("/copy/upload", server.getLastRequestPath());
+            } finally {
+                copyLoad.close();
+            }
+        }
     }
 }

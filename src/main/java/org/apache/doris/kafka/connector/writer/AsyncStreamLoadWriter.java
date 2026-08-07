@@ -145,4 +145,10 @@ public class AsyncStreamLoadWriter extends DorisWriter {
     public void fetchOffset() {
         // Won't go here
     }
+
+    @Override
+    public void close() {
+        scheduledExecutorService.shutdownNow();
+        dorisStreamLoad.close();
+    }
 }

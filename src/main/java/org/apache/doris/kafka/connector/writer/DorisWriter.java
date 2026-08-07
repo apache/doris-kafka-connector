@@ -211,6 +211,8 @@ public abstract class DorisWriter {
 
     public abstract long getOffset();
 
+    public void close() {}
+
     protected void flush(final RecordBuffer buff) {
         if (buff == null || buff.isEmpty()) {
             return;

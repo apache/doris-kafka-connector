@@ -19,11 +19,26 @@
 
 package org.apache.doris.kafka.connector.e2e.doris;
 
+import java.sql.Connection;
+import org.apache.doris.kafka.connector.cfg.DorisTlsOptions;
+
 public interface DorisContainerService {
 
     void startContainer();
 
+    Connection getQueryConnection();
+
     String getInstanceHost();
+
+    int getHttpPort();
+
+    int getQueryPort();
+
+    String getUsername();
+
+    String getPassword();
+
+    DorisTlsOptions getTlsOptions();
 
     void close();
 }

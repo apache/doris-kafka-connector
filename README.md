@@ -46,5 +46,37 @@ When you need to format your code, you have two formatting options:
 
 After executing the above formatting command, you can use `mvn spotless:check` to check whether the code format meets the requirements.
 
+## TLS configuration
+
+The connector supports opt-in one-way TLS for Doris HTTP and MySQL/JDBC connections. TLS is
+disabled by default. When it is enabled, the connector does not probe plaintext endpoints or fall
+back to plaintext after a TLS failure.
+
+| Property | Default | Description |
+| --- | --- | --- |
+| `doris.enable.tls` | `false` | Enables TLS for Doris HTTP and MySQL/JDBC connections. |
+| `doris.tls.ca-certificate-path` | empty | Worker-local PEM CA certificate or certificate-chain path. When empty, the JVM default trust store is used. |
+| `doris.tls.skip-hostname-verification` | `false` | Disables hostname verification while retaining CA and certificate validation. |
+| `doris.tls.excluded-protocols` | empty | Comma-separated protocols that remain plaintext. Supported values are `http` and `mysql`. |
+
+Example:
+
+```properties
+doris.urls=doris-fe.example.com
+doris.http.port=8040
+doris.query.port=9030
+doris.enable.tls=true
+doris.tls.ca-certificate-path=/etc/kafka-connect/certs/doris-ca.pem
+doris.tls.skip-hostname-verification=false
+doris.tls.excluded-protocols=
+```
+
+`doris.urls` continues to contain host names only; do not add `http://`, `https://`, or a port. The
+configured CA file must exist at the same local path on every Kafka Connect worker that may run the
+task. Client certificates and private keys are not supported. Copy-into uploads to external object
+storage use an independent JVM-system trust context and do not inherit a private Doris CA.
+Plaintext Doris URLs are rejected when HTTP TLS is enabled. MySQL TLS requires the bundled
+Connector/J 8 driver and never falls back to the legacy driver.
+
 ## Help
 For additional help, please [file an issue in the repository](https://github.com/apache/doris-kafka-connector/issues) or raise a question in [Apache Doris Public Slack](https://apachedoriscommunity.slack.com/).

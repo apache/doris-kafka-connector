@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.regex.Pattern;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.doris.kafka.connector.cfg.DorisTlsOptions;
 import org.apache.doris.kafka.connector.converter.ConverterMode;
 import org.apache.doris.kafka.connector.converter.schema.SchemaEvolutionMode;
 import org.apache.doris.kafka.connector.exception.ArgumentsException;
@@ -118,6 +119,38 @@ public class ConfigCheckUtils {
         if (!autoDirect.isEmpty()
                 && !("true".equalsIgnoreCase(autoDirect) || "false".equalsIgnoreCase(autoDirect))) {
             LOG.error("autoDirect non-boolean type, {}", autoDirect);
+            configIsValid = false;
+        }
+
+        String enableTls =
+                config.getOrDefault(
+                        DorisSinkConnectorConfig.DORIS_ENABLE_TLS,
+                        String.valueOf(DorisSinkConnectorConfig.DORIS_ENABLE_TLS_DEFAULT));
+        String skipHostnameVerification =
+                config.getOrDefault(
+                        DorisSinkConnectorConfig.DORIS_TLS_SKIP_HOSTNAME_VERIFICATION,
+                        String.valueOf(
+                                DorisSinkConnectorConfig
+                                        .DORIS_TLS_SKIP_HOSTNAME_VERIFICATION_DEFAULT));
+        if (!isBoolean(enableTls) || !isBoolean(skipHostnameVerification)) {
+            LOG.error("Doris TLS boolean options must be true or false");
+            configIsValid = false;
+        }
+        try {
+            DorisTlsOptions.builder()
+                    .setEnabled(Boolean.parseBoolean(enableTls))
+                    .setCaCertificatePath(
+                            config.getOrDefault(
+                                    DorisSinkConnectorConfig.DORIS_TLS_CA_CERTIFICATE_PATH,
+                                    DorisSinkConnectorConfig.DORIS_TLS_CA_CERTIFICATE_PATH_DEFAULT))
+                    .setSkipHostnameVerification(Boolean.parseBoolean(skipHostnameVerification))
+                    .setExcludedProtocols(
+                            config.getOrDefault(
+                                    DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS,
+                                    DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS_DEFAULT))
+                    .build();
+        } catch (IllegalArgumentException e) {
+            LOG.error("Invalid Doris TLS configuration", e);
             configIsValid = false;
         }
 
@@ -332,6 +365,10 @@ public class ConfigCheckUtils {
             return pattern.matcher(str).matches();
         }
         return false;
+    }
+
+    private static boolean isBoolean(String value) {
+        return "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value);
     }
 
     private static boolean isIllegalRange(String flushTime, long minValue) {

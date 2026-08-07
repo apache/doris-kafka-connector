@@ -20,6 +20,7 @@
 package org.apache.doris.kafka.connector.service;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Sets;
@@ -30,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
+import org.apache.doris.kafka.connector.writer.DorisWriter;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaAndValue;
@@ -234,5 +236,15 @@ public class TestDorisSinkService {
                 "Null valued record from topic topic_test, partition 0 and offset 1 was failed (the configuration property 'behavior.on.null.values' is 'FAIL').",
                 DataException.class,
                 () -> dorisDefaultSinkService.shouldSkipRecord(record4));
+    }
+
+    @Test
+    public void testCloseClosesWriters() {
+        DorisWriter writer = mock(DorisWriter.class);
+        dorisDefaultSinkService.writer.put("topic_0", writer);
+
+        dorisDefaultSinkService.close();
+
+        verify(writer).close();
     }
 }

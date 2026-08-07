@@ -117,4 +117,21 @@ public class TestDorisOptions {
         String httpUrl = dorisOptions.getHttpUrl();
         Assert.assertTrue(result.contains(httpUrl));
     }
+
+    @Test
+    public void testTlsOptions() {
+        props.put(DorisSinkConnectorConfig.DORIS_ENABLE_TLS, "true");
+        props.put(DorisSinkConnectorConfig.DORIS_TLS_CA_CERTIFICATE_PATH, "certs/ca.pem");
+        props.put(DorisSinkConnectorConfig.DORIS_TLS_SKIP_HOSTNAME_VERIFICATION, "true");
+        props.put(DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS, "mysql");
+
+        dorisOptions = new DorisOptions((Map) props);
+        DorisTlsOptions tlsOptions = dorisOptions.getTlsOptions();
+
+        Assert.assertTrue(tlsOptions.isEnabled());
+        Assert.assertTrue(tlsOptions.isEnabledFor(DorisTlsOptions.Protocol.HTTP));
+        Assert.assertFalse(tlsOptions.isEnabledFor(DorisTlsOptions.Protocol.MYSQL));
+        Assert.assertEquals("certs/ca.pem", tlsOptions.getCaCertificatePath());
+        Assert.assertTrue(tlsOptions.isSkipHostnameVerification());
+    }
 }

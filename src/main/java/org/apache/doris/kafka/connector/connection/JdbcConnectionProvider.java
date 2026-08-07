@@ -23,8 +23,9 @@ import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Objects;
+import java.util.Properties;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
+import org.apache.doris.kafka.connector.cfg.DorisTlsOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +41,7 @@ public class JdbcConnectionProvider implements ConnectionProvider, Serializable 
     private final DorisOptions options;
 
     private transient Connection connection;
+    private transient DorisJdbcTlsAdapter tlsAdapter;
 
     public JdbcConnectionProvider(DorisOptions options) {
         this.options = options;
@@ -51,21 +53,36 @@ public class JdbcConnectionProvider implements ConnectionProvider, Serializable 
         if (connection != null && !connection.isClosed() && connection.isValid(10)) {
             return connection;
         }
+        closeConnection();
         try {
-            Class.forName(CJ_DRIVER_NAME);
+            loadDriverClass(CJ_DRIVER_NAME);
         } catch (ClassNotFoundException ex) {
+            if (options.getTlsOptions().isEnabledFor(DorisTlsOptions.Protocol.MYSQL)) {
+                throw new ClassNotFoundException(
+                        "MySQL Connector/J 8 driver is required when Doris MySQL TLS is enabled: "
+                                + CJ_DRIVER_NAME,
+                        ex);
+            }
             LOG.warn(
                     "can not found class com.mysql.cj.jdbc.Driver, use class com.mysql.jdbc.Driver");
-            Class.forName(DRIVER_NAME);
+            loadDriverClass(DRIVER_NAME);
         }
         String jdbcUrl = String.format(JDBC_URL_TEMPLATE, options.getQueryUrl());
-        if (!Objects.isNull(options.getUser())) {
-            connection =
-                    DriverManager.getConnection(jdbcUrl, options.getUser(), options.getPassword());
-        } else {
-            connection = DriverManager.getConnection(jdbcUrl);
+        DorisJdbcTlsAdapter adapter = DorisJdbcTlsAdapter.create(options.getTlsOptions());
+        try {
+            Properties properties =
+                    adapter.createConnectionProperties(options.getUser(), options.getPassword());
+            connection = DriverManager.getConnection(jdbcUrl, properties);
+            tlsAdapter = adapter;
+        } catch (SQLException | RuntimeException e) {
+            adapter.close();
+            throw e;
         }
         return connection;
+    }
+
+    protected void loadDriverClass(String driverName) throws ClassNotFoundException {
+        Class.forName(driverName);
     }
 
     @Override
@@ -78,6 +95,10 @@ public class JdbcConnectionProvider implements ConnectionProvider, Serializable 
             } finally {
                 connection = null;
             }
+        }
+        if (tlsAdapter != null) {
+            tlsAdapter.close();
+            tlsAdapter = null;
         }
     }
 }
