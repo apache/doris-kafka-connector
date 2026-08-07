@@ -189,13 +189,15 @@ public abstract class AbstractKafka2DorisSink {
                     DorisSinkConnectorConfig.DORIS_PASSWORD, dorisContainerService.getPassword());
 
             DorisTlsOptions tlsOptions = dorisContainerService.getTlsOptions();
-            config.put(DorisSinkConnectorConfig.DORIS_ENABLE_TLS, tlsOptions.isEnabled());
+            config.put(
+                    DorisSinkConnectorConfig.DORIS_ENABLE_TLS,
+                    String.valueOf(tlsOptions.isEnabled()));
             config.put(
                     DorisSinkConnectorConfig.DORIS_TLS_CA_CERTIFICATE_PATH,
                     tlsOptions.getCaCertificatePath());
             config.put(
                     DorisSinkConnectorConfig.DORIS_TLS_SKIP_HOSTNAME_VERIFICATION,
-                    tlsOptions.isSkipHostnameVerification());
+                    String.valueOf(tlsOptions.isSkipHostnameVerification()));
             config.put(
                     DorisSinkConnectorConfig.DORIS_TLS_EXCLUDED_PROTOCOLS,
                     tlsOptions.getExcludedProtocols().stream()
