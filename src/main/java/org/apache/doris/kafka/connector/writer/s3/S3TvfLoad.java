@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
@@ -90,17 +91,28 @@ public class S3TvfLoad {
                 sqlBuilder.buildInsertSql(
                         database, table, label, objectKeys, columns, deleteSignEnabled);
         for (int attempt = 0; attempt <= MAX_INSERT_RETRIES; attempt++) {
+            long insertStartedAtNanos = System.nanoTime();
             try {
                 executeInsert(sql);
-                LOG.info("S3 TVF load committed with label {}", label);
+                LOG.info(
+                        "S3 TVF insert completed, label={}, objectCount={}, attempt={}, "
+                                + "insertTimeMs={}",
+                        label,
+                        objectKeys.size(),
+                        attempt + 1,
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - insertStartedAtNanos));
                 return;
             } catch (SQLException e) {
                 LOG.warn(
-                        "S3 TVF insert failed for label {} on attempt {} (SQLState={}, errorCode={})",
+                        "S3 TVF insert failed, label={}, objectCount={}, attempt={}, "
+                                + "insertTimeMs={}, SQLState={}, errorCode={}",
                         label,
+                        objectKeys.size(),
                         attempt + 1,
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - insertStartedAtNanos),
                         e.getSQLState(),
-                        e.getErrorCode());
+                        e.getErrorCode(),
+                        e);
                 if (isLabelAlreadyUsed(e, label)) {
                     try {
                         if (handleLabelAlreadyUsed(label)) {

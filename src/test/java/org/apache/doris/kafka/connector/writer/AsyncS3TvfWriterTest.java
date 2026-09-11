@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -53,12 +54,43 @@ import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.doris.kafka.connector.writer.s3.S3ObjectStore;
 import org.apache.doris.kafka.connector.writer.s3.S3TvfLoad;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.apache.log4j.PatternLayout;
+import org.apache.log4j.WriterAppender;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
 public class AsyncS3TvfWriterTest {
     private static final String LABEL_PREFIX = "tvf_demo_orders_";
+
+    @Test
+    public void testLogsUploadedObjectMetrics() throws Exception {
+        RecordingObjectStore store = new RecordingObjectStore();
+        S3TvfLoad load = mock(S3TvfLoad.class);
+        RecordService records = mock(RecordService.class);
+        SinkRecord record = TestRecordBuffer.newSinkRecord("ignored", 1);
+        when(records.getProcessedRecord(record)).thenReturn("{\"id\":1,\"name\":\"first\"}");
+        AsyncS3TvfWriter writer = writer(options(1024, 100), store, load, records);
+        StringWriter logs = new StringWriter();
+        WriterAppender appender = new WriterAppender(new PatternLayout("%m%n"), logs);
+        org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AsyncS3TvfWriter.class);
+        logger.addAppender(appender);
+
+        try {
+            writer.insert(record);
+            writer.commitFlush();
+        } finally {
+            logger.removeAppender(appender);
+            appender.close();
+            writer.close();
+        }
+
+        String output = logs.toString();
+        Assert.assertTrue(output.contains("S3 TVF object upload completed"));
+        Assert.assertTrue(output.contains("objectKey=objects/tvf/demo_orders/"));
+        Assert.assertTrue(output.contains("sizeBytes=24"));
+        Assert.assertTrue(output.matches("(?s).*uploadTimeMs=\\d+.*"));
+    }
 
     @Test
     public void testUsesTaskIdAndOneBatchLabelForAllFiles() throws Exception {

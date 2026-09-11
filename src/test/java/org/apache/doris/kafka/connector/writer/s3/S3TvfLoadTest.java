@@ -27,6 +27,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -38,6 +39,9 @@ import java.util.Map;
 import org.apache.doris.kafka.connector.cfg.S3TvfOptions;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
 import org.apache.doris.kafka.connector.exception.DorisException;
+import org.apache.log4j.PatternLayout;
+import org.apache.log4j.WriterAppender;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -48,6 +52,8 @@ public class S3TvfLoadTest {
     private Connection connection;
     private Statement statement;
     private String insertSql;
+    private StringWriter logs;
+    private WriterAppender appender;
 
     @Before
     public void setUp() throws Exception {
@@ -58,6 +64,39 @@ public class S3TvfLoadTest {
         when(connection.createStatement()).thenReturn(statement);
         insertSql =
                 sqlBuilder().buildInsertSql("demo", "orders", "label", files(), columns(), false);
+        logs = new StringWriter();
+        appender = new WriterAppender(new PatternLayout("%m%n"), logs);
+        org.apache.log4j.Logger.getLogger(S3TvfLoad.class).addAppender(appender);
+    }
+
+    @After
+    public void tearDown() {
+        org.apache.log4j.Logger.getLogger(S3TvfLoad.class).removeAppender(appender);
+        appender.close();
+    }
+
+    @Test
+    public void testLogsInsertMetrics() {
+        load(Collections.emptyMap()).load("label", files());
+
+        String output = logs.toString();
+        Assert.assertTrue(
+                output.contains("S3 TVF insert completed, label=label, objectCount=1, attempt=1"));
+        Assert.assertTrue(output.matches("(?s).*insertTimeMs=\\d+.*"));
+    }
+
+    @Test
+    public void testLogsInsertFailureCause() throws Exception {
+        when(statement.execute(insertSql)).thenThrow(new SQLException("temporary"));
+
+        try {
+            load(Collections.emptyMap()).load("label", files());
+            Assert.fail("Expected load failure");
+        } catch (DorisException expected) {
+            // The warning must keep the SQLException stack trace for diagnosis.
+        }
+
+        Assert.assertTrue(logs.toString().contains("java.sql.SQLException: temporary"));
     }
 
     @Test

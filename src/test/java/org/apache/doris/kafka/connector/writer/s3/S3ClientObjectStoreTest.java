@@ -23,8 +23,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -37,13 +37,14 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 public class S3ClientObjectStoreTest {
 
     @Test
-    public void testPutUsesExactBucketKeyAndJsonLinesContentType() throws Exception {
+    public void testPutUsesRepeatableContentProviderWithoutCopying() throws Exception {
         S3Client client = Mockito.mock(S3Client.class);
         when(client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenReturn(PutObjectResponse.builder().build());
         S3ClientObjectStore store = new S3ClientObjectStore(client, "staging");
+        byte[] content = "{\"id\":1}\n".getBytes(StandardCharsets.UTF_8);
 
-        store.put("kafka/orders/file.json", "{\"id\":1}\n".getBytes(StandardCharsets.UTF_8));
+        store.put("kafka/orders/file.json", content);
 
         ArgumentCaptor<PutObjectRequest> request = ArgumentCaptor.forClass(PutObjectRequest.class);
         ArgumentCaptor<RequestBody> body = ArgumentCaptor.forClass(RequestBody.class);
@@ -51,10 +52,16 @@ public class S3ClientObjectStoreTest {
         Assert.assertEquals("staging", request.getValue().bucket());
         Assert.assertEquals("kafka/orders/file.json", request.getValue().key());
         Assert.assertEquals("application/x-ndjson", request.getValue().contentType());
-        Assert.assertEquals(
-                "{\"id\":1}\n",
-                IOUtils.toString(
-                        body.getValue().contentStreamProvider().newStream(),
-                        StandardCharsets.UTF_8));
+
+        content[0] = '[';
+        try (InputStream input = body.getValue().contentStreamProvider().newStream();
+                InputStream retryInput = body.getValue().contentStreamProvider().newStream()) {
+            byte[] actual = new byte[content.length];
+            byte[] retryActual = new byte[content.length];
+            Assert.assertEquals(content.length, input.read(actual));
+            Assert.assertEquals(content.length, retryInput.read(retryActual));
+            Assert.assertArrayEquals(content, actual);
+            Assert.assertArrayEquals(content, retryActual);
+        }
     }
 }

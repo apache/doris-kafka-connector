@@ -30,6 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.S3TvfOptions;
@@ -233,10 +234,28 @@ public class AsyncS3TvfWriter extends DorisWriter {
                     if (exception.get() != null) {
                         return;
                     }
+                    long uploadStartedAtNanos = System.nanoTime();
                     try {
                         objectStore.put(objectKey, content);
                         uploadedObjectKeys.add(objectKey);
+                        LOG.info(
+                                "S3 TVF object upload completed, fileName={}, objectKey={}, "
+                                        + "sizeBytes={}, uploadTimeMs={}",
+                                fileName,
+                                objectKey,
+                                content.length,
+                                TimeUnit.NANOSECONDS.toMillis(
+                                        System.nanoTime() - uploadStartedAtNanos));
                     } catch (Exception e) {
+                        LOG.warn(
+                                "S3 TVF object upload failed, fileName={}, objectKey={}, "
+                                        + "sizeBytes={}, uploadTimeMs={}",
+                                fileName,
+                                objectKey,
+                                content.length,
+                                TimeUnit.NANOSECONDS.toMillis(
+                                        System.nanoTime() - uploadStartedAtNanos),
+                                e);
                         exception.compareAndSet(
                                 null,
                                 new DorisException("Failed to upload S3 TVF file " + objectKey, e));

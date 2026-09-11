@@ -19,6 +19,7 @@
 
 package org.apache.doris.kafka.connector.writer.s3;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.doris.kafka.connector.cfg.S3TvfOptions;
@@ -56,7 +57,12 @@ public class S3ClientObjectStore implements S3ObjectStore {
                         .contentType(JSON_LINES_CONTENT_TYPE)
                         .build();
         try {
-            s3Client.putObject(request, RequestBody.fromBytes(content));
+            s3Client.putObject(
+                    request,
+                    RequestBody.fromContentProvider(
+                            () -> new ByteArrayInputStream(content),
+                            content.length,
+                            JSON_LINES_CONTENT_TYPE));
         } catch (RuntimeException e) {
             throw new IOException("Failed to upload staged S3 object " + objectKey, e);
         }
