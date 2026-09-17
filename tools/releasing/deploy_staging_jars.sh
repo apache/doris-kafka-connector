@@ -43,7 +43,7 @@ cd ${PROJECT_ROOT}
 
 echo "Deploying to repository.apache.org"
 
-${MVN} clean deploy -Papache-release -DretryFailedDeploymentCount=10 -DskipTests=true
+${MVN} clean deploy -Daether.connector.basic.parallelPut=false -Papache-release -DretryFailedDeploymentCount=10 -DskipTests=true
 
 echo "Deploy jar finished."
 cd ${CURR_DIR}
