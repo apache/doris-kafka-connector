@@ -267,6 +267,24 @@ public class TestDorisSinkConnectorConfig {
         ConfigCheckUtils.validateConfig(getS3TvfConfig());
     }
 
+    @Test
+    public void testS3TvfIamRoleConfig() {
+        Map<String, String> config = getS3TvfConfig();
+        config.remove(DorisSinkConnectorConfig.SINK_S3_ACCESS_KEY);
+        config.remove(DorisSinkConnectorConfig.SINK_S3_SECRET_KEY);
+        config.put(
+                DorisSinkConnectorConfig.SINK_S3_ROLE_ARN, "arn:aws:iam::123456789012:role/doris");
+        config.put(DorisSinkConnectorConfig.SINK_S3_EXTERNAL_ID, "external-id");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
+    @Test(expected = DorisException.class)
+    public void testS3TvfRejectsUnsupportedCompression() {
+        Map<String, String> config = getS3TvfConfig();
+        config.put(DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX + "compress_type", "zstd");
+        ConfigCheckUtils.validateConfig(config);
+    }
+
     @Test(expected = DorisException.class)
     public void testRejectLegacyS3TvfLoadModel() {
         Map<String, String> config = getS3TvfConfig();

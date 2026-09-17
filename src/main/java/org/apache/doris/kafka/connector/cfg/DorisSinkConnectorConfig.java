@@ -100,6 +100,8 @@ public class DorisSinkConnectorConfig {
     public static final String SINK_S3_PREFIX = "sink.s3.prefix";
     public static final String SINK_S3_ACCESS_KEY = "sink.s3.access-key";
     public static final String SINK_S3_SECRET_KEY = "sink.s3.secret-key";
+    public static final String SINK_S3_ROLE_ARN = "sink.s3.role-arn";
+    public static final String SINK_S3_EXTERNAL_ID = "sink.s3.external-id";
     public static final String SINK_S3_PATH_STYLE_ACCESS = "sink.s3.path-style-access";
     public static final boolean SINK_S3_PATH_STYLE_ACCESS_DEFAULT = false;
     public static final String CONVERTER_MODE = "converter.mode";
@@ -486,13 +488,33 @@ public class DorisSinkConnectorConfig {
                         ConfigDef.Width.NONE,
                         SINK_S3_SECRET_KEY)
                 .define(
+                        SINK_S3_ROLE_ARN,
+                        Type.STRING,
+                        null,
+                        Importance.HIGH,
+                        "AWS IAM role ARN used to access S3",
+                        TVF_CONFIG,
+                        7,
+                        ConfigDef.Width.NONE,
+                        SINK_S3_ROLE_ARN)
+                .define(
+                        SINK_S3_EXTERNAL_ID,
+                        Type.STRING,
+                        null,
+                        Importance.MEDIUM,
+                        "External ID used when assuming the AWS IAM role",
+                        TVF_CONFIG,
+                        8,
+                        ConfigDef.Width.NONE,
+                        SINK_S3_EXTERNAL_ID)
+                .define(
                         SINK_S3_PATH_STYLE_ACCESS,
                         Type.BOOLEAN,
                         SINK_S3_PATH_STYLE_ACCESS_DEFAULT,
                         Importance.MEDIUM,
                         "Whether to use S3 path-style access",
                         TVF_CONFIG,
-                        7,
+                        9,
                         ConfigDef.Width.NONE,
                         SINK_S3_PATH_STYLE_ACCESS);
     }

@@ -72,6 +72,35 @@ public class S3TvfSqlBuilderTest {
         Assert.assertFalse(builder.toString().contains("s\\k"));
     }
 
+    @Test
+    public void testBuildInsertWithIamRoleAndGzip() {
+        S3TvfOptions options =
+                S3TvfOptions.builder()
+                        .setEndpoint("https://s3.example.com")
+                        .setRegion("us-east-1")
+                        .setBucket("staging")
+                        .setPrefix("objects")
+                        .setRoleArn("arn:aws:iam::123456789012:role/doris")
+                        .setExternalId("external-id")
+                        .build();
+
+        String sql =
+                new S3TvfSqlBuilder(options, true)
+                        .buildInsertSql(
+                                "demo",
+                                "orders",
+                                "label",
+                                Arrays.asList("objects/file.json.gz"),
+                                Arrays.asList("id"),
+                                false);
+
+        Assert.assertTrue(sql.contains("'s3.role_arn' = 'arn:aws:iam::123456789012:role/doris'"));
+        Assert.assertTrue(sql.contains("'s3.external_id' = 'external-id'"));
+        Assert.assertTrue(sql.contains("'compress_type' = 'gz'"));
+        Assert.assertFalse(sql.contains("s3.access_key"));
+        Assert.assertFalse(sql.contains("s3.secret_key"));
+    }
+
     private static S3TvfOptions options(String accessKey, String secretKey) {
         return S3TvfOptions.builder()
                 .setEndpoint("https://s3.example.com")

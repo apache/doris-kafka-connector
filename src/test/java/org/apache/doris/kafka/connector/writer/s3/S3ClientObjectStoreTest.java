@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import org.apache.doris.kafka.connector.cfg.S3TvfOptions;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -33,8 +34,28 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 
 public class S3ClientObjectStoreTest {
+
+    @Test
+    public void testBuildAssumeRoleRequest() {
+        S3TvfOptions options =
+                S3TvfOptions.builder()
+                        .setEndpoint("https://s3.example.com")
+                        .setRegion("us-east-1")
+                        .setBucket("staging")
+                        .setPrefix("kafka/orders")
+                        .setRoleArn("arn:aws:iam::123456789012:role/doris")
+                        .setExternalId("external-id")
+                        .build();
+
+        AssumeRoleRequest request = S3ClientObjectStore.buildAssumeRoleRequest(options);
+
+        Assert.assertEquals("arn:aws:iam::123456789012:role/doris", request.roleArn());
+        Assert.assertEquals("external-id", request.externalId());
+        Assert.assertEquals("doris-kafka-connector", request.roleSessionName());
+    }
 
     @Test
     public void testPutUsesRepeatableContentProviderWithoutCopying() throws Exception {

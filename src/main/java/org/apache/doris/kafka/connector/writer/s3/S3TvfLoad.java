@@ -61,7 +61,7 @@ public class S3TvfLoad {
             String table) {
         this(
                 connectionProvider,
-                new S3TvfSqlBuilder(options.getS3TvfOptions()),
+                new S3TvfSqlBuilder(options.getS3TvfOptions(), options.isGzipCompressionEnabled()),
                 database,
                 table,
                 options.getTvfColumns(),

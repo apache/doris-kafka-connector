@@ -27,6 +27,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
@@ -44,6 +46,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.GZIPInputStream;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.DorisSinkConnectorConfig;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
@@ -122,6 +125,26 @@ public class AsyncS3TvfWriterTest {
         Assert.assertEquals(
                 Arrays.asList(directory + label + "_7_0.json", directory + label + "_7_1.json"),
                 objectKeys.getValue());
+        writer.close();
+    }
+
+    @Test
+    public void testGzipUpload() throws Exception {
+        RecordingObjectStore store = new RecordingObjectStore();
+        S3TvfLoad load = mock(S3TvfLoad.class);
+        RecordService records = mock(RecordService.class);
+        SinkRecord record = TestRecordBuffer.newSinkRecord("ignored", 1);
+        when(records.getProcessedRecord(record)).thenReturn("{\"id\":1,\"name\":\"first\"}");
+        AsyncS3TvfWriter writer = writer(options(1024, 100, "tvf", true), store, load, records);
+
+        writer.insert(record);
+        writer.commitFlush();
+
+        Map.Entry<String, byte[]> object = store.objects.entrySet().iterator().next();
+        Assert.assertTrue(object.getKey().endsWith(".json.gz"));
+        Assert.assertEquals(
+                "{\"id\":1,\"name\":\"first\"}\n",
+                new String(gunzip(object.getValue()), StandardCharsets.UTF_8));
         writer.close();
     }
 
@@ -441,6 +464,12 @@ public class AsyncS3TvfWriterTest {
 
     private static DorisOptions options(int bufferSize, int recordCount, String labelPrefix)
             throws IOException {
+        return options(bufferSize, recordCount, labelPrefix, false);
+    }
+
+    private static DorisOptions options(
+            int bufferSize, int recordCount, String labelPrefix, boolean gzipEnabled)
+            throws IOException {
         InputStream stream =
                 AsyncS3TvfWriterTest.class
                         .getClassLoader()
@@ -464,7 +493,22 @@ public class AsyncS3TvfWriterTest {
         properties.put(DorisSinkConnectorConfig.SINK_S3_ACCESS_KEY, "access-key");
         properties.put(DorisSinkConnectorConfig.SINK_S3_SECRET_KEY, "secret-key");
         properties.put(DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX + "columns", "id,name");
+        properties.put(
+                DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX + "compress_type",
+                gzipEnabled ? "gz" : "");
         return new DorisOptions((Map) properties);
+    }
+
+    private static byte[] gunzip(byte[] content) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        try (GZIPInputStream input = new GZIPInputStream(new ByteArrayInputStream(content))) {
+            int length;
+            while ((length = input.read(buffer)) != -1) {
+                output.write(buffer, 0, length);
+            }
+        }
+        return output.toByteArray();
     }
 
     private static class RecordingObjectStore implements S3ObjectStore {

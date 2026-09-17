@@ -20,6 +20,7 @@
 package org.apache.doris.kafka.connector.writer;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.GZIPOutputStream;
 import org.apache.doris.kafka.connector.cfg.DorisOptions;
 import org.apache.doris.kafka.connector.cfg.S3TvfOptions;
 import org.apache.doris.kafka.connector.connection.ConnectionProvider;
@@ -224,8 +226,15 @@ public class AsyncS3TvfWriter extends DorisWriter {
         startBatchIfNeeded();
         int currentFileNumber = fileNumber++;
         String label = buildLabel();
+        boolean gzipEnabled = dorisOptions.isGzipCompressionEnabled();
         String fileName =
-                label + "_" + dorisOptions.getTaskId() + "_" + currentFileNumber + ".json";
+                label
+                        + "_"
+                        + dorisOptions.getTaskId()
+                        + "_"
+                        + currentFileNumber
+                        + ".json"
+                        + (gzipEnabled ? ".gz" : "");
         String objectKey = buildObjectKey(fileName);
         byte[] content = tvfBuffer.toByteArray();
         int recordCount = bufferedRecords;
@@ -236,14 +245,15 @@ public class AsyncS3TvfWriter extends DorisWriter {
                     }
                     long uploadStartedAtNanos = System.nanoTime();
                     try {
-                        objectStore.put(objectKey, content);
+                        byte[] uploadContent = gzipEnabled ? gzip(content) : content;
+                        objectStore.put(objectKey, uploadContent);
                         uploadedObjectKeys.add(objectKey);
                         LOG.info(
                                 "S3 TVF object upload completed, fileName={}, objectKey={}, "
                                         + "sizeBytes={}, uploadTimeMs={}",
                                 fileName,
                                 objectKey,
-                                content.length,
+                                uploadContent.length,
                                 TimeUnit.NANOSECONDS.toMillis(
                                         System.nanoTime() - uploadStartedAtNanos));
                     } catch (Exception e) {
@@ -272,6 +282,14 @@ public class AsyncS3TvfWriter extends DorisWriter {
                 fileName,
                 content.length,
                 recordCount);
+    }
+
+    private static byte[] gzip(byte[] content) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+            gzip.write(content);
+        }
+        return output.toByteArray();
     }
 
     private void runUploadLoop() {

@@ -34,6 +34,8 @@ public class S3TvfOptionsTest {
                         .setPrefix("kafka/orders")
                         .setAccessKey("access-key")
                         .setSecretKey("secret-key")
+                        .setRoleArn("arn:aws:iam::123456789012:role/doris")
+                        .setExternalId("external-id")
                         .setPathStyleAccess(true)
                         .build();
 
@@ -43,9 +45,12 @@ public class S3TvfOptionsTest {
         Assert.assertEquals("kafka/orders", options.getPrefix());
         Assert.assertEquals("access-key", options.getAccessKey());
         Assert.assertEquals("secret-key", options.getSecretKey());
+        Assert.assertEquals("arn:aws:iam::123456789012:role/doris", options.getRoleArn());
+        Assert.assertEquals("external-id", options.getExternalId());
         Assert.assertTrue(options.isPathStyleAccess());
         Assert.assertFalse(options.toString().contains("access-key"));
         Assert.assertFalse(options.toString().contains("secret-key"));
+        Assert.assertFalse(options.toString().contains("external-id"));
     }
 
     @Test
@@ -63,6 +68,26 @@ public class S3TvfOptionsTest {
     @Test(expected = IllegalArgumentException.class)
     public void testRejectsInvalidEndpoint() {
         validBuilder().setEndpoint("s3.example.com").build();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testRequiresCredentialsOrRole() {
+        S3TvfOptions.builder()
+                .setEndpoint("https://s3.example.com")
+                .setRegion("us-east-1")
+                .setBucket("staging")
+                .setPrefix("kafka/orders")
+                .build();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testRequiresCompleteStaticCredentials() {
+        validBuilder().setSecretKey(null).build();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testExternalIdRequiresRole() {
+        validBuilder().setExternalId("external-id").build();
     }
 
     private static S3TvfOptions.Builder validBuilder() {
