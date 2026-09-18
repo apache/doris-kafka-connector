@@ -232,6 +232,8 @@ public class DorisOptions {
                 .setPrefix(config.get(DorisSinkConnectorConfig.SINK_S3_PREFIX))
                 .setAccessKey(config.get(DorisSinkConnectorConfig.SINK_S3_ACCESS_KEY))
                 .setSecretKey(config.get(DorisSinkConnectorConfig.SINK_S3_SECRET_KEY))
+                .setRoleArn(config.get(DorisSinkConnectorConfig.SINK_S3_ROLE_ARN))
+                .setExternalId(config.get(DorisSinkConnectorConfig.SINK_S3_EXTERNAL_ID))
                 .setPathStyleAccess(
                         Boolean.parseBoolean(
                                 config.getOrDefault(
@@ -409,6 +411,10 @@ public class DorisOptions {
 
     public Properties getStreamLoadProp() {
         return streamLoadProp;
+    }
+
+    public boolean isGzipCompressionEnabled() {
+        return "gz".equalsIgnoreCase(streamLoadProp.getProperty("compress_type", "gz").trim());
     }
 
     public String getLabelPrefix() {

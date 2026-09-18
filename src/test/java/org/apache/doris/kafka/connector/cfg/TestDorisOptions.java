@@ -154,5 +154,18 @@ public class TestDorisOptions {
                 "ERROR", options.getSessionVariables().get("partial_update_new_key_behavior"));
         Assert.assertFalse(options.getSessionVariables().containsKey("format"));
         Assert.assertFalse(options.getSessionVariables().containsKey("compress_type"));
+        Assert.assertTrue(options.isGzipCompressionEnabled());
+
+        config.put("sink.properties.compress_type", "");
+        Assert.assertFalse(new DorisOptions(config).isGzipCompressionEnabled());
+
+        config.remove(DorisSinkConnectorConfig.SINK_S3_ACCESS_KEY);
+        config.remove(DorisSinkConnectorConfig.SINK_S3_SECRET_KEY);
+        config.put(
+                DorisSinkConnectorConfig.SINK_S3_ROLE_ARN, "arn:aws:iam::123456789012:role/doris");
+        config.put(DorisSinkConnectorConfig.SINK_S3_EXTERNAL_ID, "external-id");
+        S3TvfOptions roleOptions = new DorisOptions(config).getS3TvfOptions();
+        Assert.assertEquals("arn:aws:iam::123456789012:role/doris", roleOptions.getRoleArn());
+        Assert.assertEquals("external-id", roleOptions.getExternalId());
     }
 }

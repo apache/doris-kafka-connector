@@ -251,8 +251,20 @@ public class ConfigCheckUtils {
                             .setPrefix(config.get(DorisSinkConnectorConfig.SINK_S3_PREFIX))
                             .setAccessKey(config.get(DorisSinkConnectorConfig.SINK_S3_ACCESS_KEY))
                             .setSecretKey(config.get(DorisSinkConnectorConfig.SINK_S3_SECRET_KEY))
+                            .setRoleArn(config.get(DorisSinkConnectorConfig.SINK_S3_ROLE_ARN))
+                            .setExternalId(config.get(DorisSinkConnectorConfig.SINK_S3_EXTERNAL_ID))
                             .setPathStyleAccess(Boolean.parseBoolean(pathStyleAccess))
                             .build();
+                    String compressType =
+                            config.getOrDefault(
+                                            DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX
+                                                    + "compress_type",
+                                            "gz")
+                                    .trim();
+                    if (!compressType.isEmpty() && !"gz".equalsIgnoreCase(compressType)) {
+                        throw new IllegalArgumentException(
+                                "TVF write mode only supports 'gz' or an empty compress_type");
+                    }
                     TvfColumnUtils.resolveColumns(
                             config.get(
                                     DorisSinkConnectorConfig.STREAM_LOAD_PROP_PREFIX + "columns"));

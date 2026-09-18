@@ -455,7 +455,7 @@ public class S3TvfSinkITCase extends AbstractStringE2ESinkTest {
                         "^"
                                 + Pattern.quote(
                                         JSON_LABEL_PREFIX + "_" + DATABASE + "_" + JSON_TABLE + "_")
-                                + "([0-9a-f]{32})_0_([0-9]+)\\.json$");
+                                + "([0-9a-f]{32})_0_([0-9]+)\\.json\\.gz$");
         Set<String> batchUuids = new HashSet<>();
         Set<String> fileNumbers = new HashSet<>();
         for (String objectKey : objectKeys) {

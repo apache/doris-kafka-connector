@@ -30,6 +30,8 @@ public class S3TvfOptions {
     private final String prefix;
     private final String accessKey;
     private final String secretKey;
+    private final String roleArn;
+    private final String externalId;
     private final boolean pathStyleAccess;
 
     private S3TvfOptions(Builder builder) {
@@ -37,11 +39,14 @@ public class S3TvfOptions {
         this.region = requireNonEmpty(builder.region, "sink.s3.region");
         this.bucket = requireNonEmpty(builder.bucket, "sink.s3.bucket");
         this.prefix = requireNonEmpty(builder.prefix, "sink.s3.prefix");
-        this.accessKey = requireNonEmpty(builder.accessKey, "sink.s3.access-key");
-        this.secretKey = requireNonEmpty(builder.secretKey, "sink.s3.secret-key");
+        this.accessKey = trimToNull(builder.accessKey);
+        this.secretKey = trimToNull(builder.secretKey);
+        this.roleArn = trimToNull(builder.roleArn);
+        this.externalId = trimToNull(builder.externalId);
         this.pathStyleAccess = builder.pathStyleAccess;
         validateEndpoint(endpoint);
         validatePrefix(prefix);
+        validateCredentials();
     }
 
     public static Builder builder() {
@@ -70,6 +75,22 @@ public class S3TvfOptions {
 
     public String getSecretKey() {
         return secretKey;
+    }
+
+    public String getRoleArn() {
+        return roleArn;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public boolean hasRoleArn() {
+        return roleArn != null;
+    }
+
+    public boolean hasStaticCredentials() {
+        return accessKey != null;
     }
 
     public boolean isPathStyleAccess() {
@@ -103,6 +124,24 @@ public class S3TvfOptions {
         return value.trim();
     }
 
+    private static String trimToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private void validateCredentials() {
+        if ((accessKey == null) != (secretKey == null)) {
+            throw new IllegalArgumentException(
+                    "sink.s3.access-key and sink.s3.secret-key must be configured together");
+        }
+        if (accessKey == null && roleArn == null) {
+            throw new IllegalArgumentException(
+                    "S3 TVF requires either access/secret keys or sink.s3.role-arn");
+        }
+        if (externalId != null && roleArn == null) {
+            throw new IllegalArgumentException("sink.s3.external-id requires sink.s3.role-arn");
+        }
+    }
+
     private static void validatePrefix(String prefix) {
         for (char character : "*?[]{},\\".toCharArray()) {
             if (prefix.indexOf(character) >= 0) {
@@ -133,6 +172,8 @@ public class S3TvfOptions {
         private String prefix;
         private String accessKey;
         private String secretKey;
+        private String roleArn;
+        private String externalId;
         private boolean pathStyleAccess;
 
         public Builder setEndpoint(String endpoint) {
@@ -162,6 +203,16 @@ public class S3TvfOptions {
 
         public Builder setSecretKey(String secretKey) {
             this.secretKey = secretKey;
+            return this;
+        }
+
+        public Builder setRoleArn(String roleArn) {
+            this.roleArn = roleArn;
+            return this;
+        }
+
+        public Builder setExternalId(String externalId) {
+            this.externalId = externalId;
             return this;
         }
 

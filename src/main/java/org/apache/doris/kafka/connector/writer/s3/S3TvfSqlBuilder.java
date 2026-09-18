@@ -31,9 +31,15 @@ import org.apache.doris.kafka.connector.writer.LoadConstants;
 /** Builds explicit INSERT SELECT statements for staged S3 TVF files. */
 public class S3TvfSqlBuilder {
     private final S3TvfOptions options;
+    private final boolean gzipEnabled;
 
     public S3TvfSqlBuilder(S3TvfOptions options) {
+        this(options, false);
+    }
+
+    public S3TvfSqlBuilder(S3TvfOptions options, boolean gzipEnabled) {
         this.options = options;
+        this.gzipEnabled = gzipEnabled;
     }
 
     public String buildInsertSql(
@@ -52,6 +58,7 @@ public class S3TvfSqlBuilder {
         }
         String columnSql = joinIdentifiers(loadColumns);
         String uri = buildUri(objectKeys);
+        String credentials = buildCredentials();
         return "INSERT INTO "
                 + quoteIdentifier(database)
                 + "."
@@ -65,9 +72,7 @@ public class S3TvfSqlBuilder {
                 + " FROM S3("
                 + property("uri", uri)
                 + ","
-                + property("s3.access_key", options.getAccessKey())
-                + ","
-                + property("s3.secret_key", options.getSecretKey())
+                + credentials
                 + ","
                 + property("s3.region", options.getRegion())
                 + ","
@@ -76,9 +81,25 @@ public class S3TvfSqlBuilder {
                 + property("format", "json")
                 + ","
                 + property("read_json_by_line", "true")
+                + (gzipEnabled ? "," + property("compress_type", "gz") : "")
                 + ","
                 + property("use_path_style", Boolean.toString(options.isPathStyleAccess()))
                 + ")";
+    }
+
+    private String buildCredentials() {
+        StringJoiner credentials = new StringJoiner(",");
+        if (options.hasStaticCredentials()) {
+            credentials.add(property("s3.access_key", options.getAccessKey()));
+            credentials.add(property("s3.secret_key", options.getSecretKey()));
+        }
+        if (options.hasRoleArn()) {
+            credentials.add(property("s3.role_arn", options.getRoleArn()));
+            if (options.getExternalId() != null) {
+                credentials.add(property("s3.external_id", options.getExternalId()));
+            }
+        }
+        return credentials.toString();
     }
 
     private String buildUri(List<String> objectKeys) {
