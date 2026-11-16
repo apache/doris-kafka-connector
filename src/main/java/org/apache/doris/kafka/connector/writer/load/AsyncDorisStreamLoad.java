@@ -73,6 +73,12 @@ public class AsyncDorisStreamLoad extends DataLoad {
     private final AtomicBoolean started;
     private volatile boolean loadThreadAlive = false;
     private AtomicReference<Throwable> exception = new AtomicReference<>(null);
+    // Set for the lifetime of this object once a load failed: the failed buffer was dropped
+    // from the flush queue, so the records it held can only be recovered by rewinding to the
+    // last committed Kafka offsets (task restart). start() restarts the executor thread but
+    // must not clear this latch, otherwise later commits could advance offsets past the
+    // records that were dropped by the failed load.
+    private final AtomicBoolean loadFailed = new AtomicBoolean(false);
 
     public AsyncDorisStreamLoad(
             BackendUtils backendUtils, DorisOptions dorisOptions, String topic, String table) {
@@ -166,6 +172,11 @@ public class AsyncDorisStreamLoad extends DataLoad {
         if (exception.get() != null) {
             throw new DorisException(exception.get());
         }
+        if (loadFailed.get()) {
+            throw new DorisException(
+                    "A previous async stream load failed and its buffered records were lost; "
+                            + "the task must restart from the last committed Kafka offsets");
+        }
     }
 
     public void close() {
@@ -211,11 +222,13 @@ public class AsyncDorisStreamLoad extends DataLoad {
                     if (!started.get()) {
                         break;
                     }
+                    loadFailed.set(true);
                     exception.set(e);
                     flushQueue.clear();
                     break;
                 } catch (Exception e) {
                     LOG.error("worker running error", e);
+                    loadFailed.set(true);
                     exception.set(e);
                     // clear queue to avoid writer thread blocking
                     flushQueue.clear();
