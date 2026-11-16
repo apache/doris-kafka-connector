@@ -255,27 +255,48 @@ public class AsyncDorisStreamLoad extends DataLoad {
 
             try (CloseableHttpResponse response = httpClient.execute(putBuilder.build())) {
                 int statusCode = response.getStatusLine().getStatusCode();
-                if (statusCode == 200 && response.getEntity() != null) {
-                    String loadResult = EntityUtils.toString(response.getEntity());
-                    LOG.info("load Result {}", loadResult);
-                    KafkaRespContent respContent =
-                            OBJECT_MAPPER.readValue(loadResult, KafkaRespContent.class);
-                    if (respContent == null || respContent.getMessage() == null) {
-                        throw new StreamLoadException("response error : " + loadResult);
-                    }
-                    if (!DORIS_SUCCESS_STATUS.contains(respContent.getStatus())) {
-                        String errMsg =
-                                String.format(
-                                        "stream load error: %s, see more in %s",
-                                        respContent.getMessage(), respContent.getErrorURL());
-                        throw new StreamLoadException(errMsg);
-                    }
-                    respContent.setDatabase(database);
-                    respContent.setTable(table);
-                    respContent.setLastOffset(buffer.getLastOffset());
-                    respContent.setTopic(topic);
-                    respContents.add(respContent);
+                if (statusCode != 200) {
+                    String reasonPhrase = response.getStatusLine().getReasonPhrase();
+                    throw new StreamLoadException(
+                            String.format(
+                                    "stream load failed on host %s for table %s: unexpected http status %d (%s), response: %s",
+                                    hostPort,
+                                    table,
+                                    statusCode,
+                                    reasonPhrase,
+                                    errorBodySnippet(response.getEntity())));
                 }
+                if (response.getEntity() == null) {
+                    throw new StreamLoadException(
+                            String.format(
+                                    "stream load failed on host %s for table %s: http status 200 but response entity is null",
+                                    hostPort, table));
+                }
+                String loadResult = EntityUtils.toString(response.getEntity());
+                if (loadResult == null || loadResult.trim().isEmpty()) {
+                    throw new StreamLoadException(
+                            String.format(
+                                    "stream load failed on host %s for table %s: http status 200 but response body is empty",
+                                    hostPort, table));
+                }
+                LOG.info("load Result {}", loadResult);
+                KafkaRespContent respContent =
+                        OBJECT_MAPPER.readValue(loadResult, KafkaRespContent.class);
+                if (respContent == null || respContent.getMessage() == null) {
+                    throw new StreamLoadException("response error : " + loadResult);
+                }
+                if (!DORIS_SUCCESS_STATUS.contains(respContent.getStatus())) {
+                    String errMsg =
+                            String.format(
+                                    "stream load error: %s, see more in %s",
+                                    respContent.getMessage(), respContent.getErrorURL());
+                    throw new StreamLoadException(errMsg);
+                }
+                respContent.setDatabase(database);
+                respContent.setTable(table);
+                respContent.setLastOffset(buffer.getLastOffset());
+                respContent.setTopic(topic);
+                respContents.add(respContent);
             } catch (Exception ex) {
                 String err;
                 if (enableGroupCommit) {
