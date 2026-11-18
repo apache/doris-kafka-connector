@@ -65,7 +65,9 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
     @Override
     public void startTask(final String tableName, final TopicPartition topicPartition) {
         // check if the task is already started
-        String writerKey = getWriterKey(topicPartition.topic(), tableName);
+        // combined flush writes one stream load per topic+table across partitions,
+        // so the writer is keyed with partition = -1
+        WriterKey writerKey = new WriterKey(topicPartition.topic(), -1, tableName);
         if (writer.containsKey(writerKey)) {
             LOG.info("already start task with key {}", writerKey);
         } else {
@@ -125,7 +127,7 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
     @Override
     public void insert(SinkRecord record) {
         String tableName = getSinkDorisTableName(record);
-        String writerKey = getWriterKey(record.topic(), tableName);
+        WriterKey writerKey = new WriterKey(record.topic(), -1, tableName);
         // init a new topic partition
         if (!writer.containsKey(writerKey)) {
             startTask(tableName, new TopicPartition(record.topic(), -1));
@@ -152,19 +154,5 @@ public class DorisCombinedSinkService extends DorisDefaultSinkService {
         for (DorisWriter writer : writer.values()) {
             writer.commitFlush();
         }
-    }
-
-    /**
-     * Parse the writer unique key
-     *
-     * @param topic topic name
-     * @param tableName table name
-     * @return writer key
-     */
-    private String getWriterKey(String topic, String tableName) {
-        if (dorisOptions.getTopicMapTable(topic).equals(tableName)) {
-            return topic;
-        }
-        return topic + "_" + tableName;
     }
 }

@@ -121,9 +121,13 @@ public abstract class DorisWriter {
     }
 
     protected void insertRecord(final SinkRecord record) {
-        // discard the record if the record offset is smaller or equal to server side offset
+        // discard the record if the record offset is smaller or equal to server side offset.
+        // a record at or below the buffer's last offset is already buffered (a failed flush
+        // keeps its records in the buffer; Kafka Connect redelivers the failed put() batch),
+        // so it must not be buffered a second time.
         if (record.kafkaOffset() > this.offsetPersistedInDoris.get()
-                && record.kafkaOffset() > processedOffset.get()) {
+                && record.kafkaOffset() > processedOffset.get()
+                && (buffer.isEmpty() || record.kafkaOffset() > buffer.getLastOffset())) {
 
             if (skipMinOffset.get() != -1 || skipMaxOffset.get() != -1) {
                 LOG.info(
@@ -138,24 +142,22 @@ public abstract class DorisWriter {
             }
 
             SinkRecord dorisRecord = record;
-            RecordBuffer tmpBuff = null;
 
             putBuffer(dorisRecord);
             if (buffer.getBufferSizeBytes() >= dorisOptions.getFileSize()
                     || (dorisOptions.getRecordNum() != 0
                             && buffer.getNumOfRecords() >= dorisOptions.getRecordNum())) {
-                tmpBuff = buffer;
-                this.buffer = new RecordBuffer();
-            }
-
-            if (tmpBuff != null) {
                 LOG.info(
                         "trigger flush by buffer size or count, partition: {}, buffer size: {}, num of records: {}",
                         partition,
-                        tmpBuff.getBufferSizeBytes(),
-                        tmpBuff.getNumOfRecords());
-                flush(tmpBuff);
+                        buffer.getBufferSizeBytes(),
+                        buffer.getNumOfRecords());
+                // flush before replacing the buffer: if the flush fails and throws, the
+                // records stay buffered and remain visible to the offset watermark, so they
+                // cannot be acknowledged without being durably persisted
+                flush(buffer);
                 processedOffset.set(dorisRecord.kafkaOffset());
+                this.buffer = new RecordBuffer();
             }
         } else {
             if (skipMinOffset.get() == -1) {
@@ -202,9 +204,10 @@ public abstract class DorisWriter {
         if (buffer.isEmpty()) {
             return;
         }
-        RecordBuffer tmpBuff = buffer;
+        // flush before replacing the buffer: on failure the records stay buffered and the
+        // offset watermark cannot pass them
+        flush(buffer);
         this.buffer = new RecordBuffer();
-        flush(tmpBuff);
     }
 
     public abstract void commit(int partition);
@@ -228,5 +231,27 @@ public abstract class DorisWriter {
 
     protected RecordBuffer getBuffer() {
         return this.buffer;
+    }
+
+    /**
+     * Whether this writer still holds records that have not been flushed to Doris yet.
+     *
+     * @return true if there are buffered records
+     */
+    public boolean hasBufferedRecords() {
+        return this.buffer != null && !this.buffer.isEmpty();
+    }
+
+    /**
+     * The first (smallest) Kafka offset currently buffered in this writer, i.e. the earliest offset
+     * not yet flushed to Doris. Offsets at or above it must not be reported as committed.
+     *
+     * @return the first buffered offset, or -1 if nothing is buffered
+     */
+    public long getFirstBufferedOffset() {
+        if (hasBufferedRecords()) {
+            return this.buffer.getFirstOffset();
+        }
+        return -1L;
     }
 }

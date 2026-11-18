@@ -241,7 +241,8 @@ public class TestDorisSinkService {
     @Test
     public void testCloseClosesWriters() {
         DorisWriter writer = mock(DorisWriter.class);
-        dorisDefaultSinkService.writer.put("topic_0", writer);
+        dorisDefaultSinkService.writer.put(
+                new DorisDefaultSinkService.WriterKey("topic", 0, "test_kafka_tbl"), writer);
 
         dorisDefaultSinkService.close();
 
