@@ -140,6 +140,22 @@ public class DorisStreamLoad extends DataLoad {
                 respContent.setLastOffset(buffer.getLastOffset());
                 respContent.setTopic(topic);
                 respContents.add(respContent);
+            } else {
+                // An unexpected HTTP response does not confirm a successful load.
+                // Throw instead of silently treating the batch as successfully loaded.
+                LOG.error(
+                        "stream load failed on host {} for table {}: unexpected http status {} ({})",
+                        hostPort,
+                        table,
+                        statusCode,
+                        response.getStatusLine().getReasonPhrase());
+                throw new StreamLoadException(
+                        String.format(
+                                "stream load failed on host %s for table %s: unexpected http status %d (%s)",
+                                hostPort,
+                                table,
+                                statusCode,
+                                response.getStatusLine().getReasonPhrase()));
             }
         } catch (Exception ex) {
             String err;
