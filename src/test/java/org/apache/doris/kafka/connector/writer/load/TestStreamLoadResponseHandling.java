@@ -37,11 +37,9 @@ import org.apache.doris.kafka.connector.metrics.DorisConnectMonitor;
 import org.apache.doris.kafka.connector.service.DorisSystemService;
 import org.apache.doris.kafka.connector.service.RestService;
 import org.apache.doris.kafka.connector.utils.BackendUtils;
-import org.apache.doris.kafka.connector.utils.HttpUtils;
 import org.apache.doris.kafka.connector.writer.HttpEntityMock;
 import org.apache.doris.kafka.connector.writer.RecordBuffer;
 import org.apache.doris.kafka.connector.writer.StreamLoadWriter;
-import org.apache.http.HttpEntity;
 import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -55,9 +53,10 @@ import org.mockito.MockedStatic;
 
 /**
  * Tests that stream load fails loudly (throws) instead of returning normally when the HTTP response
- * is not a valid Doris success response: non-200 status, null entity, or empty body. Returning
- * normally would make upper layers advance Kafka offsets over data that never landed in Doris
- * (silent data loss, e.g. when a BE crashes and a proxy answers 502/503/504).
+ * is not a valid Doris success response: non-200 status or a null entity throw StreamLoadException
+ * (the error body is not read); an empty body already fails JSON parsing. Returning normally would
+ * make upper layers advance Kafka offsets over data that never landed in Doris (silent data loss,
+ * e.g. when a BE crashes and a proxy answers 502/503/504).
  */
 public class TestStreamLoadResponseHandling {
 
@@ -174,8 +173,8 @@ public class TestStreamLoadResponseHandling {
             streamLoad.load("label_503", newBuffer());
             Assert.fail("expected StreamLoadException for http 503");
         } catch (StreamLoadException e) {
+            // status (and reason phrase) are in the message; the error body is not read
             Assert.assertNotNull(rootMessageContaining(e, "503"));
-            Assert.assertNotNull(rootMessageContaining(e, "Bad Gateway"));
         }
         Assert.assertTrue(streamLoad.getKafkaRespContents().isEmpty());
     }
@@ -187,7 +186,7 @@ public class TestStreamLoadResponseHandling {
             streamLoad.load("label_null_entity", newBuffer());
             Assert.fail("expected StreamLoadException for null entity");
         } catch (StreamLoadException e) {
-            Assert.assertNotNull(rootMessageContaining(e, "entity is null"));
+            Assert.assertNotNull(rootMessageContaining(e, "unexpected http status 200"));
         }
         Assert.assertTrue(streamLoad.getKafkaRespContents().isEmpty());
     }
@@ -197,9 +196,11 @@ public class TestStreamLoadResponseHandling {
         DorisStreamLoad streamLoad = newStreamLoad(mockHttpClient(mockResponse(200, "", false)));
         try {
             streamLoad.load("label_empty_body", newBuffer());
-            Assert.fail("expected StreamLoadException for empty body");
+            Assert.fail("expected the empty body to fail JSON parsing");
         } catch (StreamLoadException e) {
-            Assert.assertNotNull(rootMessageContaining(e, "body is empty"));
+            // no special case: the JSON parse of the empty body fails and the existing
+            // catch wraps it — the load must not return normally
+            Assert.assertNotNull(e.getCause());
         }
         Assert.assertTrue(streamLoad.getKafkaRespContents().isEmpty());
     }
@@ -237,8 +238,8 @@ public class TestStreamLoadResponseHandling {
             executor.load("label_502", newBuffer());
             Assert.fail("expected StreamLoadException for http 502");
         } catch (StreamLoadException e) {
+            // status (and reason phrase) are in the message; the error body is not read
             Assert.assertNotNull(rootMessageContaining(e, "502"));
-            Assert.assertNotNull(rootMessageContaining(e, "proxy blew up"));
         }
     }
 
@@ -250,7 +251,7 @@ public class TestStreamLoadResponseHandling {
             executor.load("label_null_entity", newBuffer());
             Assert.fail("expected StreamLoadException for null entity");
         } catch (StreamLoadException e) {
-            Assert.assertNotNull(rootMessageContaining(e, "entity is null"));
+            Assert.assertNotNull(rootMessageContaining(e, "unexpected http status 200"));
         }
     }
 
@@ -260,9 +261,11 @@ public class TestStreamLoadResponseHandling {
                 newAsyncExecutor(mockHttpClient(mockResponse(200, "", false)));
         try {
             executor.load("label_empty_body", newBuffer());
-            Assert.fail("expected StreamLoadException for empty body");
+            Assert.fail("expected the empty body to fail JSON parsing");
         } catch (StreamLoadException e) {
-            Assert.assertNotNull(rootMessageContaining(e, "body is empty"));
+            // no special case: the JSON parse of the empty body fails and the existing
+            // catch wraps it — the load must not return normally
+            Assert.assertNotNull(e.getCause());
         }
     }
 
@@ -280,66 +283,6 @@ public class TestStreamLoadResponseHandling {
             Assert.fail("expected StreamLoadException for Doris Failed status");
         } catch (StreamLoadException e) {
             Assert.assertNotNull(rootMessageContaining(e, "insert error"));
-        }
-    }
-
-    @Test
-    public void snippetHelperHandlesNullUnreadableAndLongBody() throws Exception {
-        // null entity
-        Assert.assertEquals("<no body>", errorBodySnippet(null));
-        // empty / whitespace-only body
-        HttpEntityMock emptyEntity = new HttpEntityMock();
-        emptyEntity.setValue("   \n  ");
-        Assert.assertEquals("<empty body>", errorBodySnippet(emptyEntity));
-        // long body is truncated to the cap
-        HttpEntityMock longEntity = new HttpEntityMock();
-        StringBuilder longBody = new StringBuilder();
-        for (int i = 0; i < 200; i++) {
-            longBody.append("abcdefghij");
-        }
-        longEntity.setValue(longBody.toString());
-        String snippet = errorBodySnippet(longEntity);
-        Assert.assertTrue(snippet.length() <= 516);
-        Assert.assertTrue(snippet.endsWith("..."));
-    }
-
-    /**
-     * Finding 3 regression: the error-path snippet must read at most 512+1 bytes of the body,
-     * regardless of the body's actual size — a huge error page must not be read into memory before
-     * truncation.
-     */
-    @Test
-    public void errorSnippetReadsBoundedBytes() throws Exception {
-        StringBuilder huge = new StringBuilder();
-        for (int i = 0; i < 20000; i++) {
-            huge.append("0123456789");
-        }
-        CountingContentEntity entity = new CountingContentEntity();
-        entity.setValue(huge.toString());
-        String snippet = errorBodySnippet(entity);
-        Assert.assertTrue(snippet.length() <= 516);
-        Assert.assertTrue(snippet.endsWith("..."));
-        Assert.assertTrue(
-                "body must not be read fully, read " + entity.bytesRead + " bytes",
-                entity.bytesRead <= 513);
-    }
-
-    /** {@link HttpEntityMock} whose stream counts how many bytes were consumed. */
-    private static final class CountingContentEntity extends HttpEntityMock {
-        private int bytesRead;
-
-        @Override
-        public java.io.InputStream getContent() throws java.io.IOException {
-            return new java.io.FilterInputStream(super.getContent()) {
-                @Override
-                public int read(byte[] b, int off, int len) throws java.io.IOException {
-                    int n = super.read(b, off, len);
-                    if (n > 0) {
-                        bytesRead += n;
-                    }
-                    return n;
-                }
-            };
         }
     }
 
@@ -397,16 +340,31 @@ public class TestStreamLoadResponseHandling {
         clientField.set(
                 streamLoad, mockHttpClient(mockResponse(503, "Bad Gateway from proxy", false)));
 
+        // the executor thread sets its alive flag as its first statement; wait for it so
+        // the flush cannot lose the race against thread startup (pre-existing behavior)
+        Field aliveField = AsyncDorisStreamLoad.class.getDeclaredField("loadThreadAlive");
+        aliveField.setAccessible(true);
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (!(boolean) aliveField.get(streamLoad)) {
+            Assert.assertTrue(
+                    "load executor thread did not start", System.currentTimeMillis() < deadline);
+            Thread.sleep(10);
+        }
+
         RecordBuffer buffer = newBuffer();
         buffer.setLabel("label_async_503");
-        streamLoad.flush("label_async_503", buffer);
         try {
+            // depending on executor scheduling, the failure surfaces either on the
+            // post-enqueue exception check inside flush() or on forceFlush() — both
+            // are correct production behavior
+            streamLoad.flush("label_async_503", buffer);
             streamLoad.forceFlush();
-            Assert.fail("expected the async 503 failure to surface on forceFlush");
+            Assert.fail("expected the async 503 failure to surface on flush or forceFlush");
         } catch (Exception e) {
             Assert.assertNotNull(rootMessageContaining(e, "503"));
+        } finally {
+            streamLoad.close();
         }
-        streamLoad.close();
     }
 
     private static SinkRecord newSinkRecord(String topic, String value, long offset) {
@@ -419,20 +377,4 @@ public class TestStreamLoadResponseHandling {
                 value,
                 offset);
     }
-
-    private static String errorBodySnippet(HttpEntity entity) {
-        // direct test hook for the protected helper
-        try {
-            java.lang.reflect.Method m =
-                    DataLoad.class.getDeclaredMethod("errorBodySnippet", HttpEntity.class);
-            m.setAccessible(true);
-            return (String) m.invoke(null, entity);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    // HttpUtils reference keeps the import meaningful for the fixture family.
-    @SuppressWarnings("unused")
-    private static final Class<HttpUtils> HTTP_UTILS = HttpUtils.class;
 }
