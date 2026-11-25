@@ -58,6 +58,12 @@ public class AsyncDorisStreamLoad extends DataLoad {
     private static final String LOAD_PATH_PATTERN = "/api/%s/%s/_stream_load";
     private static final List<String> DORIS_SUCCESS_STATUS =
             new ArrayList<>(Arrays.asList(LoadStatus.SUCCESS, LoadStatus.PUBLISH_TIMEOUT));
+
+    // Doris answers a duplicate load label with the "Label Already Exists" status and, in
+    // the same response, the status of the existing job: FINISHED means the earlier load
+    // committed the data, RUNNING means it is still executing
+    private static final String LABEL_ALREADY_EXISTS_STATUS = "Label Already Exists";
+    private static final String EXISTING_JOB_STATUS_FINISHED = "FINISHED";
     private String loadUrl;
     private final DorisOptions dorisOptions;
     private final String topic;
@@ -73,11 +79,11 @@ public class AsyncDorisStreamLoad extends DataLoad {
     private final AtomicBoolean started;
     private volatile boolean loadThreadAlive = false;
     private AtomicReference<Throwable> exception = new AtomicReference<>(null);
-    // Set for the lifetime of this object once a load failed: the failed buffer was dropped
-    // from the flush queue, so the records it held can only be recovered by rewinding to the
-    // last committed Kafka offsets (task restart). start() restarts the executor thread but
-    // must not clear this latch, otherwise later commits could advance offsets past the
-    // records that were dropped by the failed load.
+    // Set for the lifetime of this object once a load failed and its retries were exhausted:
+    // the failed buffer is dropped and the records it held can only be recovered by replaying
+    // from the last committed Kafka offsets (task restart). start() restarts the executor
+    // thread but must not clear this latch, otherwise later commits could advance offsets
+    // past the records that were dropped by the failed load.
     private final AtomicBoolean loadFailed = new AtomicBoolean(false);
 
     public AsyncDorisStreamLoad(
@@ -174,8 +180,9 @@ public class AsyncDorisStreamLoad extends DataLoad {
         }
         if (loadFailed.get()) {
             throw new DorisException(
-                    "A previous async stream load failed and its buffered records were lost; "
-                            + "the task must restart from the last committed Kafka offsets");
+                    "A previous async stream load failed and its retries were exhausted; its "
+                            + "buffered records are no longer available for retry, the task must"
+                            + " restart from the last committed Kafka offsets");
         }
     }
 
@@ -215,7 +222,10 @@ public class AsyncDorisStreamLoad extends DataLoad {
                         // When the label is empty, it is the eof buffer for checkpoint flush.
                         continue;
                     }
-                    load(buffer.getLabel(), buffer);
+                    loadWithRetry(buffer);
+                    if (loadFailed.get()) {
+                        break;
+                    }
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -237,6 +247,68 @@ public class AsyncDorisStreamLoad extends DataLoad {
             }
             LOG.info("LoadAsyncExecutor stop");
             loadThreadAlive = false;
+        }
+
+        /**
+         * Loads one buffer, preserving both the buffer and its original load label.
+         *
+         * <p>For ordinary stream loads the load is retried with its original label, bounded by
+         * max.retries with retry.interval.ms backoff: Doris registers a stream load label when the
+         * load is submitted and rejects a second load with the same label while the first is still
+         * running or has committed, so a same-label retry cannot load the same batch twice as long
+         * as Doris retains the label's metadata and the label uniquely identifies this logical
+         * load. A duplicate-label rejection whose existing job is FINISHED is accepted as
+         * completion by the load() response handling. Any other failed attempt never proves the
+         * data was not written, so the only further outcomes are a confirmed success (load returns
+         * normally) or, once the retries are exhausted, the failure latch.
+         *
+         * <p>Group commit sends no client-controlled label, so a retry could re-send a batch Doris
+         * already accepted; it fails closed to the latch on the first failure instead of retrying.
+         */
+        private void loadWithRetry(RecordBuffer buffer) throws InterruptedException {
+            if (enableGroupCommit) {
+                try {
+                    load(buffer.getLabel(), buffer);
+                    return;
+                } catch (Exception e) {
+                    LOG.error(
+                            "stream load failed for label {}, latching the writer",
+                            buffer.getLabel(),
+                            e);
+                    latchFailure(e);
+                    return;
+                }
+            }
+            int remainingRetries = dorisOptions.getMaxRetries();
+            while (true) {
+                try {
+                    load(buffer.getLabel(), buffer);
+                    return;
+                } catch (Exception e) {
+                    if (remainingRetries <= 0) {
+                        LOG.error(
+                                "stream load failed for label {} after retries, latching the writer",
+                                buffer.getLabel(),
+                                e);
+                        latchFailure(e);
+                        return;
+                    }
+                    remainingRetries--;
+                    LOG.warn(
+                            "stream load failed for label {}, retries left: {}",
+                            buffer.getLabel(),
+                            remainingRetries,
+                            e);
+                    Thread.sleep(dorisOptions.getRetryIntervalMs());
+                }
+            }
+        }
+
+        private void latchFailure(Exception e) {
+            loadFailed.set(true);
+            exception.set(e);
+            // clear queue to avoid writer thread blocking
+            flushQueue.clear();
         }
 
         /** execute stream load. */
@@ -276,12 +348,28 @@ public class AsyncDorisStreamLoad extends DataLoad {
                     if (respContent == null || respContent.getMessage() == null) {
                         throw new StreamLoadException("response error : " + loadResult);
                     }
-                    if (!DORIS_SUCCESS_STATUS.contains(respContent.getStatus())) {
+                    boolean confirmedFinishedDuplicate =
+                            LABEL_ALREADY_EXISTS_STATUS.equals(respContent.getStatus())
+                                    && EXISTING_JOB_STATUS_FINISHED.equals(
+                                            respContent.getExistingJobStatus())
+                                    && label != null
+                                    && label.equals(respContent.getLabel());
+                    if (!DORIS_SUCCESS_STATUS.contains(respContent.getStatus())
+                            && !confirmedFinishedDuplicate) {
+                        // a duplicate-label rejection without a FINISHED existing job is
+                        // ambiguous: the existing load may still be running or may have
+                        // failed, so it keeps failing until it resolves or retries end
                         String errMsg =
                                 String.format(
                                         "stream load error: %s, see more in %s",
                                         respContent.getMessage(), respContent.getErrorURL());
                         throw new StreamLoadException(errMsg);
+                    }
+                    if (confirmedFinishedDuplicate) {
+                        LOG.info(
+                                "stream load for label {} already finished by an earlier attempt: {}",
+                                label,
+                                respContent.getMessage());
                     }
                     respContent.setDatabase(database);
                     respContent.setTable(table);

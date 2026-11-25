@@ -69,7 +69,10 @@ public class TestCombineFlushFailedLoadCommits {
         mockRestService = mockStatic(RestService.class);
         config = combineFlushConfig();
         context = mock(SinkTaskContext.class);
-        when(context.assignment()).thenReturn(Collections.singleton(PARTITION));
+        when(context.assignment())
+                .thenReturn(
+                        new java.util.HashSet<>(
+                                java.util.Arrays.asList(PARTITION, new TopicPartition(TOPIC, 1))));
     }
 
     @After
@@ -94,6 +97,9 @@ public class TestCombineFlushFailedLoadCommits {
         properties.put(DorisSinkConnectorConfig.ENABLE_COMBINE_FLUSH, "true");
         properties.put(DorisSinkConnectorConfig.DELIVERY_GUARANTEE, "at_least_once");
         properties.put(DorisSinkConnectorConfig.BUFFER_FLUSH_TIME_SEC, "3600");
+        // fast, bounded retries for the executor's load retry loop
+        properties.put(DorisSinkConnectorConfig.MAX_RETRIES, "2");
+        properties.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, "10");
         return (Map<String, String>) (Map) properties;
     }
 
@@ -106,6 +112,105 @@ public class TestCombineFlushFailedLoadCommits {
                 Schema.OPTIONAL_STRING_SCHEMA,
                 value,
                 offset);
+    }
+
+    @Test
+    public void multiPartitionCombinedBufferRecoversAfterTransientFailure() throws Exception {
+        DorisCombinedSinkService service = new DorisCombinedSinkService(config, context);
+        DorisOptions options = new DorisOptions(config);
+        service.startTask(TABLE, PARTITION);
+        RecordingHttpClient client = new RecordingHttpClient();
+        injectRecordingClient(service, options, client);
+
+        // both partitions of the topic feed one combined writer and one buffer
+        service.insert(Collections.singleton(record(100, "{\"id\":100}")));
+        service.insert(
+                Collections.singleton(
+                        new SinkRecord(
+                                TOPIC,
+                                1,
+                                Schema.OPTIONAL_STRING_SCHEMA,
+                                "key",
+                                Schema.OPTIONAL_STRING_SCHEMA,
+                                "{\"id\":101}",
+                                0)));
+        TopicPartition partition1 = new TopicPartition(TOPIC, 1);
+
+        // the combined load fails once, then the executor retry recovers automatically
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
+        offsets.put(PARTITION, new OffsetAndMetadata(101));
+        offsets.put(partition1, new OffsetAndMetadata(1));
+        // commit() blocks through the failed attempt and the successful retry
+        service.commit(offsets);
+
+        // only after the durable load may both partitions' offsets be reported
+        Assert.assertEquals(100, service.getOffset(PARTITION));
+        Assert.assertEquals(0, service.getOffset(partition1));
+        service.close();
+    }
+
+    @Test
+    public void taskRestartReplaysFromLastCommittedOffsets() throws Exception {
+        Map<String, String> taskConfig = new HashMap<>(combineFlushConfig());
+        taskConfig.put(DorisSinkConnectorConfig.MAX_RETRIES, "2");
+        taskConfig.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, "0");
+        org.apache.doris.kafka.connector.DorisSinkTask failedTask =
+                new org.apache.doris.kafka.connector.DorisSinkTask();
+        failedTask.initialize(context);
+        failedTask.start(taskConfig);
+        failedTask.open(Collections.singleton(PARTITION));
+
+        Field sinkField =
+                org.apache.doris.kafka.connector.DorisSinkTask.class.getDeclaredField("sink");
+        sinkField.setAccessible(true);
+        DorisCombinedSinkService failedService =
+                (DorisCombinedSinkService) sinkField.get(failedTask);
+        RecordingHttpClient failingClient = new RecordingHttpClient();
+        injectRecordingClient(failedService, new DorisOptions(taskConfig), failingClient);
+
+        // offset 100 buffers, the load fails and the retries are exhausted: the task fails
+        failedTask.put(Collections.singleton(record(100, "{\"id\":100}")));
+        failingClient.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        Map<TopicPartition, OffsetAndMetadata> offsets =
+                Collections.singletonMap(PARTITION, new OffsetAndMetadata(101));
+        Assert.assertThrows(DorisException.class, () -> failedTask.preCommit(offsets));
+        // re-delivered put()s stay retriable until the task's retries are exhausted
+        Assert.assertThrows(
+                RetriableException.class,
+                () -> failedTask.put(Collections.singleton(record(100, "{\"id\":100}"))));
+        Assert.assertThrows(
+                RetriableException.class,
+                () -> failedTask.put(Collections.singleton(record(100, "{\"id\":100}"))));
+        Assert.assertThrows(
+                DorisException.class,
+                () -> failedTask.put(Collections.singleton(record(100, "{\"id\":100}"))));
+        failedTask.stop();
+
+        // Kafka Connect restarts the task: a new task instance with fresh writers replays
+        // the redelivered records from the last committed offset and commits successfully
+        org.apache.doris.kafka.connector.DorisSinkTask restartedTask =
+                new org.apache.doris.kafka.connector.DorisSinkTask();
+        restartedTask.initialize(context);
+        restartedTask.start(taskConfig);
+        restartedTask.open(Collections.singleton(PARTITION));
+        DorisCombinedSinkService restartedService =
+                (DorisCombinedSinkService) sinkField.get(restartedTask);
+        RecordingHttpClient recoveringClient = new RecordingHttpClient();
+        injectRecordingClient(restartedService, new DorisOptions(taskConfig), recoveringClient);
+
+        recoveringClient.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        restartedTask.put(Collections.singleton(record(100, "{\"id\":100}")));
+        Map<TopicPartition, OffsetAndMetadata> replayed =
+                Collections.singletonMap(PARTITION, new OffsetAndMetadata(101));
+        // preCommit must return the durable offsets, not just not throw
+        Map<TopicPartition, OffsetAndMetadata> committed = restartedTask.preCommit(replayed);
+
+        Assert.assertNotNull(committed.get(PARTITION));
+        Assert.assertEquals(100, committed.get(PARTITION).offset());
+        Assert.assertEquals(100, restartedService.getOffset(PARTITION));
+        restartedTask.stop();
     }
 
     /**

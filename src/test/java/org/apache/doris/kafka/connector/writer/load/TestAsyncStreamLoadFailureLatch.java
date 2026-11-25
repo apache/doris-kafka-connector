@@ -49,10 +49,11 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Regression tests for the failure latch of {@link AsyncDorisStreamLoad}: once a background load
- * failed, its buffered records were dropped from the flush queue, so the writer must keep failing
- * (also across executor restarts triggered by {@code DorisSinkTask.put()}) until the task is
- * restarted and consumption resumes from the last committed offsets.
+ * Regression tests for the bounded retry and failure latch of {@link AsyncDorisStreamLoad}: a
+ * failed background load is retried with its original buffer and label; a transient failure
+ * recovers automatically, and only when the retries are exhausted are the buffered records dropped
+ * and the writer latched (also across executor restarts triggered by {@code DorisSinkTask.put()})
+ * until the task is restarted and consumption resumes from the last committed offsets.
  */
 public class TestAsyncStreamLoadFailureLatch {
     private DorisOptions options;
@@ -66,16 +67,40 @@ public class TestAsyncStreamLoadFailureLatch {
         DorisSinkConnectorConfig.setDefaultValues((Map) props);
         props.put("task_id", "0");
         props.put("name", "async-failure-latch-test");
+        // fast, bounded retries for the executor's load retry loop
+        props.put(DorisSinkConnectorConfig.MAX_RETRIES, "2");
+        props.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, "10");
+        // keep request payloads readable for the payload-preservation assertions
+        props.put("sink.properties.compress_type", "");
         options = new DorisOptions((Map) props);
     }
 
     private AsyncDorisStreamLoad newStreamLoad(CloseableHttpClient client) {
+        return newStreamLoad(client, options);
+    }
+
+    private AsyncDorisStreamLoad newStreamLoad(CloseableHttpClient client, DorisOptions options) {
         BackendUtils backendUtils = mock(BackendUtils.class);
         when(backendUtils.getAvailableBackend()).thenReturn("be:8040");
         AsyncDorisStreamLoad streamLoad =
                 new AsyncDorisStreamLoad(backendUtils, options, "orders-topic", "orders", client);
         awaitLoadThread(streamLoad);
         return streamLoad;
+    }
+
+    private AsyncDorisStreamLoad newStreamLoad(CloseableHttpClient client, long retryIntervalMs)
+            throws IOException {
+        InputStream stream =
+                getClass().getClassLoader().getResourceAsStream("doris-connector-sink.properties");
+        Properties props = new Properties();
+        props.load(stream);
+        DorisSinkConnectorConfig.setDefaultValues((Map) props);
+        props.put("task_id", "0");
+        props.put("name", "long-backoff-test");
+        props.put(DorisSinkConnectorConfig.MAX_RETRIES, "2");
+        props.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, String.valueOf(retryIntervalMs));
+        props.put("sink.properties.compress_type", "");
+        return newStreamLoad(client, new DorisOptions((Map) props));
     }
 
     /**
@@ -238,6 +263,436 @@ public class TestAsyncStreamLoadFailureLatch {
         streamLoad.checkException();
     }
 
+    @Test
+    public void transientFailureRecoversWithoutLatch() {
+        // a Doris Failed load result followed by a successful retry of the same load:
+        // the writer must recover automatically, with no latch and no exception
+        RecordingHttpClient client = new RecordingHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-transient", dataBuffer());
+        // blocks through the failed attempt and its successful retry
+        streamLoad.forceFlush();
+
+        streamLoad.checkException();
+        streamLoad.start();
+        streamLoad.checkException();
+        streamLoad.close();
+    }
+
+    @Test
+    public void retryReusesTheOriginalLabel() {
+        // every attempt of one load must carry the same label: Doris rejects a second load
+        // with a committed or running label, so a same-label retry cannot load a batch twice
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        RecordBuffer multiRecord = new RecordBuffer();
+        multiRecord.insert("{\"id\":\"a1\"}");
+        multiRecord.insert("{\"id\":\"a2\"}");
+        streamLoad.flush("label-reuse", multiRecord);
+        streamLoad.forceFlush();
+        streamLoad.checkException();
+
+        Assert.assertEquals(
+                java.util.Arrays.asList("label-reuse", "label-reuse", "label-reuse"),
+                client.requestLabels());
+        // every attempt transmits the identical, complete payload of the buffer
+        Assert.assertEquals(3, client.requestBodies().size());
+        for (byte[] body : client.requestBodies()) {
+            Assert.assertArrayEquals(client.requestBodies().get(0), body);
+            String text = new String(body, java.nio.charset.StandardCharsets.UTF_8);
+            Assert.assertTrue("payload must keep all records: " + text, text.contains("a1"));
+            Assert.assertTrue("payload must keep all records: " + text, text.contains("a2"));
+        }
+        streamLoad.close();
+    }
+
+    @Test
+    public void ambiguousLabelAlreadyExistFailsClosed() {
+        // a lost response after Doris committed the load: every retry of the same label is
+        // rejected with "Label Already Exists" but without an ExistingJobStatus. The
+        // rejection does not prove the data was not written, but also does not prove that
+        // it was, so the writer must fail closed: bounded retries, then the latch, and no
+        // offset advancement
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addIoError("connection reset");
+        client.addResponse(200, duplicateLabelBody("label-ambiguous", null));
+        client.addResponse(200, duplicateLabelBody("label-ambiguous", null));
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-ambiguous", dataBuffer());
+        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
+
+        Assert.assertEquals(
+                java.util.Arrays.asList("label-ambiguous", "label-ambiguous", "label-ambiguous"),
+                client.requestLabels());
+
+        // the latch survives the executor restart (the put() retry path)
+        streamLoad.start();
+        Assert.assertThrows(DorisException.class, streamLoad::checkException);
+        streamLoad.close();
+    }
+
+    @Test
+    public void duplicateLabelFinishedRecoversWithoutLatch() {
+        // a lost response after Doris committed the load: the duplicate-label rejection
+        // carries ExistingJobStatus=FINISHED, which confirms the load committed — accepted
+        // as completion, no retry storm, no latch, no offset stall
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addIoError("connection reset");
+        client.addResponse(200, duplicateLabelBody("label-dup-finished", "FINISHED"));
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-dup-finished", dataBuffer());
+        // blocks through the failed attempt and its confirmed-finished rejection
+        streamLoad.forceFlush();
+
+        streamLoad.checkException();
+        Assert.assertEquals(
+                java.util.Arrays.asList("label-dup-finished", "label-dup-finished"),
+                client.requestLabels());
+        streamLoad.close();
+    }
+
+    @Test
+    public void duplicateLabelRunningThenFinishedRecovers() {
+        // the existing job is still RUNNING on the first retry (ambiguous: it may still
+        // fail), and FINISHED on the second: recover without latching
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addIoError("connection reset");
+        client.addResponse(200, duplicateLabelBody("label-dup-running", "RUNNING"));
+        client.addResponse(200, duplicateLabelBody("label-dup-running", "FINISHED"));
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-dup-running", dataBuffer());
+        streamLoad.forceFlush();
+        streamLoad.checkException();
+
+        Assert.assertEquals(3, client.requestLabels().size());
+        streamLoad.close();
+    }
+
+    @Test
+    public void duplicateLabelRunningUntilExhaustionLatches() {
+        // the existing job stays RUNNING across all retries: fail closed to the latch
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addIoError("connection reset");
+        client.addResponse(200, duplicateLabelBody("label-dup-running2", "RUNNING"));
+        client.addResponse(200, duplicateLabelBody("label-dup-running2", "RUNNING"));
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-dup-running2", dataBuffer());
+        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
+        Assert.assertEquals(3, client.requestLabels().size());
+        streamLoad.start();
+        Assert.assertThrows(DorisException.class, streamLoad::checkException);
+        streamLoad.close();
+    }
+
+    @Test
+    public void connectionFailureRecoversWithoutLatch() {
+        // a connection-level failure (connection refused while the BE restarts) followed by
+        // a successful retry of the same load: automatic recovery, no latch
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addIoError("connection refused");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-conn", dataBuffer());
+        streamLoad.forceFlush();
+        streamLoad.checkException();
+        streamLoad.close();
+    }
+
+    @Test
+    public void retryReselectsBackendBetweenAttempts() {
+        // each attempt re-selects the backend (refreshLoadUrl -> getAvailableBackend per
+        // load call), so a retry can land on a healthy backend after the first one died
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        BackendUtils backendUtils = mock(BackendUtils.class);
+        when(backendUtils.getAvailableBackend()).thenReturn("be1:8040", "be2:8040");
+        AsyncDorisStreamLoad streamLoad =
+                new AsyncDorisStreamLoad(backendUtils, options, "orders-topic", "orders", client);
+        awaitLoadThread(streamLoad);
+
+        streamLoad.flush("label-failover", dataBuffer());
+        streamLoad.forceFlush();
+        streamLoad.checkException();
+
+        Assert.assertEquals(java.util.Arrays.asList("be1:8040", "be2:8040"), client.requestHosts());
+        streamLoad.close();
+    }
+
+    @Test
+    public void closeDuringRetryBackoffInterruptsPromptly() throws Exception {
+        // close() while the executor sleeps in the retry backoff must interrupt the sleep
+        // and shut down promptly, without latching (the interrupt exit checks `started`)
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client, 60_000L);
+
+        streamLoad.flush("label-backoff", dataBuffer());
+        // the first attempt fails immediately; the executor then sleeps for 60s
+        awaitLoadThreadBusyInBackoff(client);
+        long before = System.currentTimeMillis();
+        streamLoad.close();
+        awaitLoadThreadExit(streamLoad);
+        Assert.assertTrue(
+                "close must interrupt the backoff promptly",
+                System.currentTimeMillis() - before < 10_000);
+
+        // a single served request proves the close interrupted the backoff before a second
+        // attempt, and the interrupt while shutting down must not have latched the writer
+        Assert.assertEquals(1, client.requestLabels().size());
+        streamLoad.checkException();
+    }
+
+    @Test
+    public void groupCommitFailureLatchesWithoutRetry() throws Exception {
+        // group commit sends no client-controlled load label, so a retry could re-send a
+        // batch Doris already accepted: the first failure latches instead of retrying
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client, groupCommitOptions());
+
+        streamLoad.flush("label-gc", dataBuffer());
+        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
+
+        // a single attempt only, carrying no client-controlled label: no retry may
+        // resubmit an unlabelled batch
+        Thread.sleep(200);
+        Assert.assertEquals(1, client.requestLabels().size());
+        Assert.assertNull(client.requestLabels().get(0));
+        streamLoad.start();
+        Assert.assertThrows(DorisException.class, streamLoad::checkException);
+        streamLoad.close();
+    }
+
+    /** The documented duplicate-label response: a distinct status plus ExistingJobStatus. */
+    private static String duplicateLabelBody(String label, String existingJobStatus) {
+        if (existingJobStatus == null) {
+            return String.format(
+                    "{\"Status\": \"Label Already Exists\", \"Label\": \"%s\","
+                            + " \"Message\": \"label [%s] already exist\"}",
+                    label, label);
+        }
+        return String.format(
+                "{\"Status\": \"Label Already Exists\", \"Label\": \"%s\","
+                        + " \"ExistingJobStatus\": \"%s\","
+                        + " \"Message\": \"label [%s] already exist\"}",
+                label, existingJobStatus, label);
+    }
+
+    /** Options with group commit enabled (stream_load_prop.group_commit). */
+    private DorisOptions groupCommitOptions() throws IOException {
+        InputStream stream =
+                getClass().getClassLoader().getResourceAsStream("doris-connector-sink.properties");
+        Properties props = new Properties();
+        props.load(stream);
+        DorisSinkConnectorConfig.setDefaultValues((Map) props);
+        props.put("task_id", "0");
+        props.put("name", "group-commit-test");
+        props.put(DorisSinkConnectorConfig.MAX_RETRIES, "2");
+        props.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, "10");
+        props.put("sink.properties.compress_type", "");
+        props.put("sink.properties.group_commit", "async_mode");
+        return new DorisOptions((Map) props);
+    }
+
+    /**
+     * Waits until the executor is deterministically inside the retry backoff: the first scripted
+     * response has been handed to the executor thread, and that same thread is in TIMED_WAITING —
+     * inside {@code loadWithRetry} the only timed wait after a served response is the backoff
+     * sleep.
+     */
+    private static void awaitLoadThreadBusyInBackoff(ScriptedHttpClient client) {
+        long deadline = System.currentTimeMillis() + 10_000;
+        Thread executor;
+        do {
+            executor = client.firstServingThread();
+            Assert.assertTrue(
+                    "first load attempt did not start", System.currentTimeMillis() < deadline);
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        } while (executor == null || executor.getState() != Thread.State.TIMED_WAITING);
+    }
+
+    @Test
+    public void gzipDefaultPayloadPreservedAcrossRetries() throws Exception {
+        // with the default compress_type=gz, each attempt transmits a gzip entity: the
+        // recorded (still compressed) payloads must still be identical across attempts,
+        // and decompressing them must yield the complete original records
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+
+        InputStream stream =
+                getClass().getClassLoader().getResourceAsStream("doris-connector-sink.properties");
+        Properties gzipProps = new Properties();
+        gzipProps.load(stream);
+        DorisSinkConnectorConfig.setDefaultValues((Map) gzipProps);
+        gzipProps.put("task_id", "0");
+        gzipProps.put("name", "gzip-payload-test");
+        gzipProps.put(DorisSinkConnectorConfig.MAX_RETRIES, "2");
+        gzipProps.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, "10");
+        // no compress_type override: the default gz applies
+
+        BackendUtils backendUtils = mock(BackendUtils.class);
+        when(backendUtils.getAvailableBackend()).thenReturn("be:8040");
+        AsyncDorisStreamLoad streamLoad =
+                new AsyncDorisStreamLoad(
+                        backendUtils,
+                        new DorisOptions((Map) gzipProps),
+                        "orders-topic",
+                        "orders",
+                        client);
+        awaitLoadThread(streamLoad);
+
+        RecordBuffer buffer = new RecordBuffer();
+        buffer.insert("{\"id\":\"g1\"}");
+        buffer.insert("{\"id\":\"g2\"}");
+        streamLoad.flush("label-gzip", buffer);
+        streamLoad.forceFlush();
+        streamLoad.checkException();
+
+        Assert.assertEquals(3, client.requestBodies().size());
+        String decompressed = gunzip(client.requestBodies().get(0));
+        for (byte[] body : client.requestBodies()) {
+            Assert.assertArrayEquals(client.requestBodies().get(0), body);
+            Assert.assertEquals(decompressed, gunzip(body));
+        }
+        Assert.assertTrue(
+                "payload must keep all records: " + decompressed,
+                decompressed.contains("g1") && decompressed.contains("g2"));
+        streamLoad.close();
+    }
+
+    @Test
+    public void duplicateLabelFinishedWithDifferentLabelFailsClosed() {
+        // a FINISHED duplicate-label response whose Label does not match the label we sent
+        // is not accepted as completion: it keeps failing until the retries are exhausted
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, duplicateLabelBody("some-other-label", "FINISHED"));
+        client.addResponse(200, duplicateLabelBody("some-other-label", "FINISHED"));
+        client.addResponse(200, duplicateLabelBody("some-other-label", "FINISHED"));
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-ours", dataBuffer());
+        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
+
+        Assert.assertEquals(
+                java.util.Arrays.asList("label-ours", "label-ours", "label-ours"),
+                client.requestLabels());
+        streamLoad.start();
+        Assert.assertThrows(DorisException.class, streamLoad::checkException);
+        streamLoad.close();
+    }
+
+    private static String gunzip(byte[] gzipped) throws java.io.IOException {
+        java.io.ByteArrayInputStream bytes = new java.io.ByteArrayInputStream(gzipped);
+        try (java.util.zip.GZIPInputStream gzip = new java.util.zip.GZIPInputStream(bytes)) {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[1024];
+            int n;
+            while ((n = gzip.read(chunk)) > 0) {
+                out.write(chunk, 0, n);
+            }
+            return new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    @Test
+    public void inFlightFailureRetainsPendingQueuedBuffer() throws Exception {
+        // buffer A is in flight when buffer B is enqueued behind it; A's first attempt fails,
+        // its retry succeeds, and B — still queued throughout — is loaded afterwards
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        ScriptedHttpClient.BlockingStep blockedA = client.addBlockingStep();
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        RecordBuffer bufferA = new RecordBuffer();
+        bufferA.insert("{\"id\":\"a1\"}");
+        bufferA.insert("{\"id\":\"a2\"}");
+        RecordBuffer bufferB = new RecordBuffer();
+        bufferB.insert("{\"id\":\"b1\"}");
+        streamLoad.flush("label-a", bufferA);
+        Assert.assertTrue(blockedA.awaitStarted(10, TimeUnit.SECONDS));
+        // A is in flight (polled out of the capacity-1 queue): B enters the queue behind it
+        streamLoad.flush("label-b", bufferB);
+        blockedA.release();
+
+        // the forceFlush barrier waits for A's retry and B's load to complete
+        streamLoad.forceFlush();
+        streamLoad.checkException();
+
+        Assert.assertEquals(
+                java.util.Arrays.asList("label-a", "label-a", "label-b"), client.requestLabels());
+        // A's two attempts carry the identical complete payload; B's is distinct and intact
+        Assert.assertEquals(3, client.requestBodies().size());
+        Assert.assertArrayEquals(client.requestBodies().get(0), client.requestBodies().get(1));
+        Assert.assertFalse(
+                java.util.Arrays.equals(
+                        client.requestBodies().get(0), client.requestBodies().get(2)));
+        Assert.assertTrue(
+                new String(client.requestBodies().get(2), java.nio.charset.StandardCharsets.UTF_8)
+                        .contains("b1"));
+        streamLoad.close();
+    }
+
+    @Test
+    public void forceFlushWaitsForInFlightLoadThenSucceeds() throws Exception {
+        // the preCommit path may run while a load is still in flight; forceFlush must not
+        // return before the load has finished, and after a successful load it returns
+        // normally (no latch)
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        ScriptedHttpClient.BlockingStep blocked = client.addBlockingStep();
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        streamLoad.flush("label-blocking", dataBuffer());
+        Assert.assertTrue(blocked.awaitStarted(10, TimeUnit.SECONDS));
+
+        AtomicBoolean returned = new AtomicBoolean(false);
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        Thread flusher =
+                new Thread(
+                        () -> {
+                            try {
+                                streamLoad.forceFlush();
+                                returned.set(true);
+                            } catch (Throwable t) {
+                                thrown.set(t);
+                            }
+                        },
+                        "force-flush-success-thread");
+        flusher.start();
+        Thread.sleep(300);
+        Assert.assertFalse(
+                "forceFlush returned while the load was still in flight", returned.get());
+        Assert.assertNull(thrown.get());
+
+        blocked.release();
+        flusher.join(10_000);
+        Assert.assertTrue(
+                "forceFlush must return normally after a successful load", returned.get());
+        Assert.assertNull(thrown.get());
+        streamLoad.checkException();
+        streamLoad.close();
+    }
+
     /**
      * HTTP client whose single request blocks until the test releases it, then fails with an
      * IOException — a connection reset while the request is in flight.
@@ -280,5 +735,184 @@ public class TestAsyncStreamLoadFailureLatch {
 
         @Override
         public void close() {}
+    }
+    /**
+     * Scripted HTTP client for the retry tests: every executed request records its stream load
+     * label header, and each request consumes one scripted step — either an HTTP response or an
+     * IOException. A blocking step parks the request until the test releases it, simulating a load
+     * that is still in flight.
+     */
+    private static final class ScriptedHttpClient extends CloseableHttpClient {
+        private final java.util.List<String> labels =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        private final java.util.List<byte[]> bodies =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        private final java.util.List<String> hosts =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        private final java.util.List<Thread> servingThreads =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        private final java.util.Queue<Step> steps =
+                new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+        Step addResponse(int status, String body) {
+            Step step = new ResponseStep(status, body);
+            steps.add(step);
+            return step;
+        }
+
+        Step addIoError(String message) {
+            Step step = new IoErrorStep(message);
+            steps.add(step);
+            return step;
+        }
+
+        BlockingStep addBlockingStep() {
+            BlockingStep step = new BlockingStep();
+            steps.add(step);
+            return step;
+        }
+
+        java.util.List<String> requestLabels() {
+            synchronized (labels) {
+                return new java.util.ArrayList<>(labels);
+            }
+        }
+
+        java.util.List<byte[]> requestBodies() {
+            synchronized (bodies) {
+                return new java.util.ArrayList<>(bodies);
+            }
+        }
+
+        java.util.List<String> requestHosts() {
+            synchronized (hosts) {
+                return new java.util.ArrayList<>(hosts);
+            }
+        }
+
+        Thread firstServingThread() {
+            synchronized (servingThreads) {
+                return servingThreads.isEmpty() ? null : servingThreads.get(0);
+            }
+        }
+
+        @Override
+        protected CloseableHttpResponse doExecute(
+                HttpHost target, HttpRequest request, HttpContext context) throws IOException {
+            labels.add(
+                    request.getLastHeader("label") == null
+                            ? null
+                            : request.getLastHeader("label").getValue());
+            hosts.add(target == null ? null : target.toHostString());
+            servingThreads.add(Thread.currentThread());
+            if (request instanceof org.apache.http.HttpEntityEnclosingRequest) {
+                org.apache.http.HttpEntity entity =
+                        ((org.apache.http.HttpEntityEnclosingRequest) request).getEntity();
+                if (entity == null) {
+                    bodies.add(null);
+                } else {
+                    // writeTo works for plain and gzip entities alike; getContent does not
+                    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                    try {
+                        entity.writeTo(out);
+                    } catch (java.io.IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    bodies.add(out.toByteArray());
+                }
+            } else {
+                bodies.add(null);
+            }
+            Step step = steps.poll();
+            if (step == null) {
+                throw new IOException("no scripted step left");
+            }
+            return step.run();
+        }
+
+        @Override
+        @Deprecated
+        public HttpParams getParams() {
+            return null;
+        }
+
+        @Override
+        @Deprecated
+        public ClientConnectionManager getConnectionManager() {
+            return null;
+        }
+
+        @Override
+        public void close() {}
+
+        interface Step {
+            CloseableHttpResponse run() throws IOException;
+        }
+
+        private static final class ResponseStep implements Step {
+            private final int status;
+            private final String body;
+
+            ResponseStep(int status, String body) {
+                this.status = status;
+                this.body = body;
+            }
+
+            @Override
+            public CloseableHttpResponse run() {
+                CloseableHttpResponse response =
+                        org.mockito.Mockito.mock(CloseableHttpResponse.class);
+                org.mockito.Mockito.when(response.getStatusLine())
+                        .thenReturn(
+                                new org.apache.http.message.BasicStatusLine(
+                                        new org.apache.http.ProtocolVersion("HTTP", 1, 1),
+                                        status,
+                                        ""));
+                if (body != null) {
+                    org.mockito.Mockito.when(response.getEntity())
+                            .thenReturn(
+                                    new org.apache.http.entity.StringEntity(
+                                            body, java.nio.charset.StandardCharsets.UTF_8));
+                }
+                return response;
+            }
+        }
+
+        private static final class IoErrorStep implements Step {
+            private final String message;
+
+            IoErrorStep(String message) {
+                this.message = message;
+            }
+
+            @Override
+            public CloseableHttpResponse run() throws IOException {
+                throw new IOException(message);
+            }
+        }
+
+        static final class BlockingStep implements Step {
+            private final CountDownLatch started = new CountDownLatch(1);
+            private final CountDownLatch release = new CountDownLatch(1);
+
+            void release() {
+                release.countDown();
+            }
+
+            boolean awaitStarted(long timeout, TimeUnit unit) throws InterruptedException {
+                return started.await(timeout, unit);
+            }
+
+            @Override
+            public CloseableHttpResponse run() throws IOException {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                throw new IOException("connection reset during load");
+            }
+        }
     }
 }
