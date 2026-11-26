@@ -50,6 +50,8 @@ github:
             app_id: 15368
           - context: License Check
             app_id: 15368
+          - context: e2e test case
+            app_id: 15368
 
   rulesets:
     - name: Default and release branch protection
