@@ -23,10 +23,11 @@ header:
 
   paths-ignore:
     - 'LICENSE'
+    - 'NOTICE.txt'
     - '.gitignore'
     - 'config/archive/**'
     - 'src/test/resources/decode/avro/**'
     - 'src/test/resources/e2e/**'
     - 'src/test/resources/tls/**'
 
-  comment: on-failure
+  comment: never
