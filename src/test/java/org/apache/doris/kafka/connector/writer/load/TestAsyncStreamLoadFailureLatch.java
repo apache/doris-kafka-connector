@@ -49,11 +49,12 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Regression tests for the bounded retry and failure latch of {@link AsyncDorisStreamLoad}: a
- * failed background load is retried with its original buffer and label; a transient failure
- * recovers automatically, and only when the retries are exhausted are the buffered records dropped
- * and the writer latched (also across executor restarts triggered by {@code DorisSinkTask.put()})
- * until the task is restarted and consumption resumes from the last committed offsets.
+ * Regression tests for the bounded retry and sticky terminal failure of {@link
+ * AsyncDorisStreamLoad}: a failed background load is retried with its original buffer and a
+ * distinct label per attempt; a transient failure recovers automatically, and only when the retries
+ * are exhausted is the terminal failure published on the exception reference, where it sticks (also
+ * across executor restarts triggered by {@code DorisSinkTask.put()}) until the task is restarted
+ * and consumption resumes from the last committed offsets.
  */
 public class TestAsyncStreamLoadFailureLatch {
     private DorisOptions options;
@@ -88,19 +89,27 @@ public class TestAsyncStreamLoadFailureLatch {
         return streamLoad;
     }
 
-    private AsyncDorisStreamLoad newStreamLoad(CloseableHttpClient client, long retryIntervalMs)
-            throws IOException {
+    private AsyncDorisStreamLoad newStreamLoad(
+            CloseableHttpClient client, int maxRetries, long retryIntervalMs) throws IOException {
         InputStream stream =
                 getClass().getClassLoader().getResourceAsStream("doris-connector-sink.properties");
         Properties props = new Properties();
         props.load(stream);
         DorisSinkConnectorConfig.setDefaultValues((Map) props);
         props.put("task_id", "0");
-        props.put("name", "long-backoff-test");
-        props.put(DorisSinkConnectorConfig.MAX_RETRIES, "2");
+        props.put("name", "retry-config-test");
+        props.put(DorisSinkConnectorConfig.MAX_RETRIES, String.valueOf(maxRetries));
         props.put(DorisSinkConnectorConfig.RETRY_INTERVAL_MS, String.valueOf(retryIntervalMs));
         props.put("sink.properties.compress_type", "");
         return newStreamLoad(client, new DorisOptions((Map) props));
+    }
+
+    private static String labelOfLength(int length, String tail) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < length - tail.length(); i++) {
+            sb.append('L');
+        }
+        return sb.append(tail).toString();
     }
 
     /**
@@ -146,10 +155,17 @@ public class TestAsyncStreamLoadFailureLatch {
         streamLoad.flush("label-1", dataBuffer());
         // the background load fails; the failure surfaces on the next flush interaction
         Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
+        // wait for the failed executor to exit, so start() deterministically restarts it
+        awaitLoadThreadExit(streamLoad);
 
         // DorisSinkTask.put() retries via sink.init() -> AsyncStreamLoadWriter.start() ->
-        // AsyncDorisStreamLoad.start(), which restarts the executor thread; the failure
-        // must survive that restart, otherwise the dropped buffer is never recovered
+        // AsyncDorisStreamLoad.start(), which restarts the executor thread; the terminal
+        // failure must survive that restart, otherwise the dropped buffer is never
+        // recovered
+        streamLoad.start();
+        awaitLoadThread(streamLoad);
+        Assert.assertThrows(DorisException.class, streamLoad::checkException);
+        // repeated start() calls must not clear the terminal failure either
         streamLoad.start();
         Assert.assertThrows(DorisException.class, streamLoad::checkException);
         Assert.assertThrows(DorisException.class, () -> streamLoad.flush("label-2", dataBuffer()));
@@ -199,8 +215,8 @@ public class TestAsyncStreamLoadFailureLatch {
      *
      * <p>The barrier is structural: waitAsyncLoadFinish() enqueues two eof markers into the
      * capacity-1 flush queue, and the single sequential executor thread can only poll the second
-     * marker after load() has returned. If load() failed, exception/loadFailed are set (and the
-     * queue cleared) before the blocked marker put unblocks, so the post-put checkFlushException()
+     * marker after load() has returned. If the load failed, the exception is set (and the queue
+     * cleared) before the blocked marker put unblocks, so the post-put checkFlushException()
      * throws.
      */
     @Test
@@ -283,9 +299,10 @@ public class TestAsyncStreamLoadFailureLatch {
     }
 
     @Test
-    public void retryReusesTheOriginalLabel() {
-        // every attempt of one load must carry the same label: Doris rejects a second load
-        // with a committed or running label, so a same-label retry cannot load a batch twice
+    public void retryUsesDistinctLabelsDerivedFromBase() {
+        // every attempt carries a distinct label: the first uses the buffer's original
+        // label and every retry derives a fresh label from it, so a retry can never be
+        // rejected as a duplicate of an earlier attempt of the same load
         ScriptedHttpClient client = new ScriptedHttpClient();
         client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
         client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
@@ -300,7 +317,7 @@ public class TestAsyncStreamLoadFailureLatch {
         streamLoad.checkException();
 
         Assert.assertEquals(
-                java.util.Arrays.asList("label-reuse", "label-reuse", "label-reuse"),
+                java.util.Arrays.asList("label-reuse", "label-reuse_1", "label-reuse_2"),
                 client.requestLabels());
         // every attempt transmits the identical, complete payload of the buffer
         Assert.assertEquals(3, client.requestBodies().size());
@@ -314,84 +331,110 @@ public class TestAsyncStreamLoadFailureLatch {
     }
 
     @Test
-    public void ambiguousLabelAlreadyExistFailsClosed() {
-        // a lost response after Doris committed the load: every retry of the same label is
-        // rejected with "Label Already Exists" but without an ExistingJobStatus. The
-        // rejection does not prove the data was not written, but also does not prove that
-        // it was, so the writer must fail closed: bounded retries, then the latch, and no
-        // offset advancement
+    public void retryLabelRespectsDorisLabelLengthLimit() {
+        // Doris rejects labels longer than label_regex_length (default 128, configurable):
+        // when the base label leaves no room for a plain "<base>_<attempt>" suffix, the
+        // retry label keeps a fingerprint of the complete base label — so it fits the
+        // limit, always differs from the base label (a 128-char base ending in "_1" would
+        // reproduce itself under naive truncation) and differs between attempts
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
+
+        String longBase = labelOfLength(128, "_1");
+        streamLoad.flush(longBase, dataBuffer());
+        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
+
+        java.util.List<String> labels = client.requestLabels();
+        Assert.assertEquals(3, labels.size());
+        Assert.assertEquals(longBase, labels.get(0));
+        for (int i = 1; i < labels.size(); i++) {
+            Assert.assertTrue(
+                    "label exceeds the 128-char limit: " + labels.get(i),
+                    labels.get(i).length() <= 128);
+            Assert.assertNotEquals(
+                    "retry label must differ from the base label", longBase, labels.get(i));
+        }
+        Assert.assertNotEquals(labels.get(1), labels.get(2));
+        streamLoad.close();
+    }
+
+    @Test
+    public void retryLabelsStayDistinctAcrossAttemptDigitBoundary() throws Exception {
+        // attempt numbers crossing the single/double-digit boundary change the suffix
+        // length; every retry label must still differ from the base label and from every
+        // earlier retry label — including a 128-char base ending in "_10"
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        for (int i = 0; i < 13; i++) {
+            client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        }
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client, 12, 10L);
+
+        String longBase = labelOfLength(128, "_10");
+        streamLoad.flush(longBase, dataBuffer());
+        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
+
+        java.util.List<String> labels = client.requestLabels();
+        Assert.assertEquals(13, labels.size());
+        Assert.assertEquals(longBase, labels.get(0));
+        Assert.assertEquals(13, new java.util.HashSet<>(labels).size());
+        for (String label : labels) {
+            Assert.assertTrue("label exceeds the 128-char limit: " + label, label.length() <= 128);
+        }
+        streamLoad.close();
+    }
+
+    @Test
+    public void duplicateLabelRejectionRetriesThenLatches() {
+        // a "Label Already Exists" rejection is an ordinary failure for a changed-label
+        // retry: the rejection keeps the load failing, the retries are exhausted and the
+        // terminal failure sticks, with no offset advancement
         ScriptedHttpClient client = new ScriptedHttpClient();
         client.addIoError("connection reset");
-        client.addResponse(200, duplicateLabelBody("label-ambiguous", null));
-        client.addResponse(200, duplicateLabelBody("label-ambiguous", null));
+        client.addResponse(200, duplicateLabelBody("label-ambiguous_1"));
+        client.addResponse(200, duplicateLabelBody("label-ambiguous_2"));
         AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
 
         streamLoad.flush("label-ambiguous", dataBuffer());
         Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
 
         Assert.assertEquals(
-                java.util.Arrays.asList("label-ambiguous", "label-ambiguous", "label-ambiguous"),
+                java.util.Arrays.asList(
+                        "label-ambiguous", "label-ambiguous_1", "label-ambiguous_2"),
                 client.requestLabels());
 
-        // the latch survives the executor restart (the put() retry path)
+        // the terminal failure survives the executor restart (the put() retry path)
         streamLoad.start();
         Assert.assertThrows(DorisException.class, streamLoad::checkException);
         streamLoad.close();
     }
 
     @Test
-    public void duplicateLabelFinishedRecoversWithoutLatch() {
-        // a lost response after Doris committed the load: the duplicate-label rejection
-        // carries ExistingJobStatus=FINISHED, which confirms the load committed — accepted
-        // as completion, no retry storm, no latch, no offset stall
+    public void lostResponseRetriesWithNewLabelAndMayResubmit() {
+        // a lost response after Doris committed the load: the retry uses a new label and
+        // re-sends the identical complete payload, so the same batch may now exist in Doris
+        // twice. Combined-flush mode is at-least-once — this documents the duplicate
+        // submission instead of claiming exactly-once delivery.
         ScriptedHttpClient client = new ScriptedHttpClient();
-        client.addIoError("connection reset");
-        client.addResponse(200, duplicateLabelBody("label-dup-finished", "FINISHED"));
+        client.addIoError("connection reset while the response was in flight");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
         AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
 
-        streamLoad.flush("label-dup-finished", dataBuffer());
-        // blocks through the failed attempt and its confirmed-finished rejection
+        RecordBuffer multiRecord = new RecordBuffer();
+        multiRecord.insert("{\"id\":\"d1\"}");
+        multiRecord.insert("{\"id\":\"d2\"}");
+        streamLoad.flush("label-lost-response", multiRecord);
+        // blocks through the lost attempt and its successful retry
         streamLoad.forceFlush();
 
         streamLoad.checkException();
         Assert.assertEquals(
-                java.util.Arrays.asList("label-dup-finished", "label-dup-finished"),
+                java.util.Arrays.asList("label-lost-response", "label-lost-response_1"),
                 client.requestLabels());
-        streamLoad.close();
-    }
-
-    @Test
-    public void duplicateLabelRunningThenFinishedRecovers() {
-        // the existing job is still RUNNING on the first retry (ambiguous: it may still
-        // fail), and FINISHED on the second: recover without latching
-        ScriptedHttpClient client = new ScriptedHttpClient();
-        client.addIoError("connection reset");
-        client.addResponse(200, duplicateLabelBody("label-dup-running", "RUNNING"));
-        client.addResponse(200, duplicateLabelBody("label-dup-running", "FINISHED"));
-        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
-
-        streamLoad.flush("label-dup-running", dataBuffer());
-        streamLoad.forceFlush();
-        streamLoad.checkException();
-
-        Assert.assertEquals(3, client.requestLabels().size());
-        streamLoad.close();
-    }
-
-    @Test
-    public void duplicateLabelRunningUntilExhaustionLatches() {
-        // the existing job stays RUNNING across all retries: fail closed to the latch
-        ScriptedHttpClient client = new ScriptedHttpClient();
-        client.addIoError("connection reset");
-        client.addResponse(200, duplicateLabelBody("label-dup-running2", "RUNNING"));
-        client.addResponse(200, duplicateLabelBody("label-dup-running2", "RUNNING"));
-        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
-
-        streamLoad.flush("label-dup-running2", dataBuffer());
-        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
-        Assert.assertEquals(3, client.requestLabels().size());
-        streamLoad.start();
-        Assert.assertThrows(DorisException.class, streamLoad::checkException);
+        Assert.assertEquals(2, client.requestBodies().size());
+        Assert.assertArrayEquals(client.requestBodies().get(0), client.requestBodies().get(1));
         streamLoad.close();
     }
 
@@ -437,7 +480,7 @@ public class TestAsyncStreamLoadFailureLatch {
         // and shut down promptly, without latching (the interrupt exit checks `started`)
         ScriptedHttpClient client = new ScriptedHttpClient();
         client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
-        AsyncDorisStreamLoad streamLoad = newStreamLoad(client, 60_000L);
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client, 2, 60_000L);
 
         streamLoad.flush("label-backoff", dataBuffer());
         // the first attempt fails immediately; the executor then sleeps for 60s
@@ -476,19 +519,12 @@ public class TestAsyncStreamLoadFailureLatch {
         streamLoad.close();
     }
 
-    /** The documented duplicate-label response: a distinct status plus ExistingJobStatus. */
-    private static String duplicateLabelBody(String label, String existingJobStatus) {
-        if (existingJobStatus == null) {
-            return String.format(
-                    "{\"Status\": \"Label Already Exists\", \"Label\": \"%s\","
-                            + " \"Message\": \"label [%s] already exist\"}",
-                    label, label);
-        }
+    /** The documented duplicate-label response body. */
+    private static String duplicateLabelBody(String label) {
         return String.format(
                 "{\"Status\": \"Label Already Exists\", \"Label\": \"%s\","
-                        + " \"ExistingJobStatus\": \"%s\","
                         + " \"Message\": \"label [%s] already exist\"}",
-                label, existingJobStatus, label);
+                label, label);
     }
 
     /** Options with group commit enabled (stream_load_prop.group_commit). */
@@ -579,27 +615,6 @@ public class TestAsyncStreamLoadFailureLatch {
         streamLoad.close();
     }
 
-    @Test
-    public void duplicateLabelFinishedWithDifferentLabelFailsClosed() {
-        // a FINISHED duplicate-label response whose Label does not match the label we sent
-        // is not accepted as completion: it keeps failing until the retries are exhausted
-        ScriptedHttpClient client = new ScriptedHttpClient();
-        client.addResponse(200, duplicateLabelBody("some-other-label", "FINISHED"));
-        client.addResponse(200, duplicateLabelBody("some-other-label", "FINISHED"));
-        client.addResponse(200, duplicateLabelBody("some-other-label", "FINISHED"));
-        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
-
-        streamLoad.flush("label-ours", dataBuffer());
-        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
-
-        Assert.assertEquals(
-                java.util.Arrays.asList("label-ours", "label-ours", "label-ours"),
-                client.requestLabels());
-        streamLoad.start();
-        Assert.assertThrows(DorisException.class, streamLoad::checkException);
-        streamLoad.close();
-    }
-
     private static String gunzip(byte[] gzipped) throws java.io.IOException {
         java.io.ByteArrayInputStream bytes = new java.io.ByteArrayInputStream(gzipped);
         try (java.util.zip.GZIPInputStream gzip = new java.util.zip.GZIPInputStream(bytes)) {
@@ -639,7 +654,7 @@ public class TestAsyncStreamLoadFailureLatch {
         streamLoad.checkException();
 
         Assert.assertEquals(
-                java.util.Arrays.asList("label-a", "label-a", "label-b"), client.requestLabels());
+                java.util.Arrays.asList("label-a", "label-a_1", "label-b"), client.requestLabels());
         // A's two attempts carry the identical complete payload; B's is distinct and intact
         Assert.assertEquals(3, client.requestBodies().size());
         Assert.assertArrayEquals(client.requestBodies().get(0), client.requestBodies().get(1));
