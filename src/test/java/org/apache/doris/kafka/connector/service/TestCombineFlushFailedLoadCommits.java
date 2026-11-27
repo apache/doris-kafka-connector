@@ -188,8 +188,9 @@ public class TestCombineFlushFailedLoadCommits {
                 () -> failedTask.put(Collections.singleton(record(100, "{\"id\":100}"))));
         failedTask.stop();
 
-        // Kafka Connect restarts the task: a new task instance with fresh writers replays
-        // the redelivered records from the last committed offset and commits successfully
+        // simulate the external task restart: a new task instance with fresh writers
+        // replays the redelivered records from the last committed offset and commits
+        // successfully
         org.apache.doris.kafka.connector.DorisSinkTask restartedTask =
                 new org.apache.doris.kafka.connector.DorisSinkTask();
         restartedTask.initialize(context);

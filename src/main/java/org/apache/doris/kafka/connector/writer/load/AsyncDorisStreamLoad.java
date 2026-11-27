@@ -58,7 +58,6 @@ public class AsyncDorisStreamLoad extends DataLoad {
     private static final String LOAD_PATH_PATTERN = "/api/%s/%s/_stream_load";
     private static final List<String> DORIS_SUCCESS_STATUS =
             new ArrayList<>(Arrays.asList(LoadStatus.SUCCESS, LoadStatus.PUBLISH_TIMEOUT));
-
     private String loadUrl;
     private final DorisOptions dorisOptions;
     private final String topic;
@@ -226,16 +225,7 @@ public class AsyncDorisStreamLoad extends DataLoad {
             loadThreadAlive = false;
         }
 
-        /**
-         * Loads one buffer, retrying with a distinct label per attempt, bounded by max.retries with
-         * retry.interval.ms backoff. Group commit sends no client-controlled label, so it keeps a
-         * single attempt.
-         */
         private void loadWithRetry(RecordBuffer buffer) throws IOException, InterruptedException {
-            if (enableGroupCommit) {
-                load(buffer.getLabel(), buffer);
-                return;
-            }
             String label = buffer.getLabel();
             for (int retry = 0; retry <= dorisOptions.getMaxRetries(); retry++) {
                 try {

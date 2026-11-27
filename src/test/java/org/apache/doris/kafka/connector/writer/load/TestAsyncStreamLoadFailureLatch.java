@@ -50,11 +50,7 @@ import org.junit.Test;
 
 /**
  * Regression tests for the bounded retry and sticky terminal failure of {@link
- * AsyncDorisStreamLoad}: a failed background load is retried with its original buffer and a
- * distinct label per attempt; a transient failure recovers automatically, and only when the retries
- * are exhausted is the terminal failure published on the exception reference, where it sticks (also
- * across executor restarts triggered by {@code DorisSinkTask.put()}) until the task is restarted
- * and consumption resumes from the last committed offsets.
+ * AsyncDorisStreamLoad}.
  */
 public class TestAsyncStreamLoadFailureLatch {
     private DorisOptions options;
@@ -145,19 +141,15 @@ public class TestAsyncStreamLoadFailureLatch {
         AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
 
         streamLoad.flush("label-1", dataBuffer());
-        // the background load fails; the failure surfaces on the next flush interaction
         Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
         // wait for the failed executor to exit, so start() deterministically restarts it
         awaitLoadThreadExit(streamLoad);
 
-        // DorisSinkTask.put() retries via sink.init() -> AsyncStreamLoadWriter.start() ->
-        // AsyncDorisStreamLoad.start(), which restarts the executor thread; the terminal
-        // failure must survive that restart, otherwise the dropped buffer is never
-        // recovered
+        // the executor restart from DorisSinkTask.put() -> sink.init() -> start() must not
+        // clear the terminal failure
         streamLoad.start();
         awaitLoadThread(streamLoad);
         Assert.assertThrows(DorisException.class, streamLoad::checkException);
-        // repeated start() calls must not clear the terminal failure either
         streamLoad.start();
         Assert.assertThrows(DorisException.class, streamLoad::checkException);
         Assert.assertThrows(DorisException.class, () -> streamLoad.flush("label-2", dataBuffer()));
@@ -273,8 +265,6 @@ public class TestAsyncStreamLoadFailureLatch {
 
     @Test
     public void transientFailureRecoversWithoutLatch() {
-        // a Doris Failed load result followed by a successful retry of the same load:
-        // the writer must recover automatically, with no latch and no exception
         RecordingHttpClient client = new RecordingHttpClient();
         client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
         client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
@@ -292,10 +282,8 @@ public class TestAsyncStreamLoadFailureLatch {
 
     @Test
     public void retryUsesDistinctLabelsDerivedFromBase() throws Exception {
-        // every attempt carries a distinct label: the first uses the buffer's original
-        // label and every retry derives a fresh label from it (across the attempt digit
-        // boundary), so a retry can never be rejected as a duplicate of an earlier
-        // attempt of the same load
+        // the first attempt uses the buffer's original label, every retry a distinct
+        // label derived from it
         ScriptedHttpClient client = new ScriptedHttpClient();
         for (int i = 0; i < 13; i++) {
             client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
@@ -328,9 +316,7 @@ public class TestAsyncStreamLoadFailureLatch {
 
     @Test
     public void duplicateLabelRejectionRetriesThenLatches() {
-        // a "Label Already Exists" rejection is an ordinary failure for a changed-label
-        // retry: the rejection keeps the load failing, the retries are exhausted and the
-        // terminal failure sticks, with no offset advancement
+        // a duplicate-label rejection is an ordinary failure for a changed-label retry
         ScriptedHttpClient client = new ScriptedHttpClient();
         client.addIoError("connection reset");
         client.addResponse(200, duplicateLabelBody("label-ambiguous_1"));
@@ -353,10 +339,8 @@ public class TestAsyncStreamLoadFailureLatch {
 
     @Test
     public void lostResponseRetriesWithNewLabelAndMayResubmit() {
-        // a lost response after Doris committed the load: the retry uses a new label and
-        // re-sends the identical complete payload, so the same batch may now exist in Doris
-        // twice. Combined-flush mode is at-least-once — this documents the duplicate
-        // submission instead of claiming exactly-once delivery.
+        // a lost response may hide a committed load: the retry re-sends the identical
+        // payload under a new label, so the batch may exist twice (at-least-once)
         ScriptedHttpClient client = new ScriptedHttpClient();
         client.addIoError("connection reset while the response was in flight");
         client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
@@ -380,8 +364,6 @@ public class TestAsyncStreamLoadFailureLatch {
 
     @Test
     public void connectionFailureRecoversWithoutLatch() {
-        // a connection-level failure (connection refused while the BE restarts) followed by
-        // a successful retry of the same load: automatic recovery, no latch
         ScriptedHttpClient client = new ScriptedHttpClient();
         client.addIoError("connection refused");
         client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
@@ -439,23 +421,49 @@ public class TestAsyncStreamLoadFailureLatch {
     }
 
     @Test
-    public void groupCommitFailureLatchesWithoutRetry() throws Exception {
-        // group commit sends no client-controlled load label, so a retry could re-send a
-        // batch Doris already accepted: the first failure latches instead of retrying
+    public void groupCommitFailureRetriesThenLatches() throws Exception {
+        // group commit sends no client-controlled label: every retry is a fresh
+        // server-labelled submission
         ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
         client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
         AsyncDorisStreamLoad streamLoad = newStreamLoad(client, groupCommitOptions());
 
         streamLoad.flush("label-gc", dataBuffer());
         Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
 
-        // a single attempt only, carrying no client-controlled label: no retry may
-        // resubmit an unlabelled batch
-        Thread.sleep(200);
-        Assert.assertEquals(1, client.requestLabels().size());
-        Assert.assertNull(client.requestLabels().get(0));
+        // every attempt carries no client-controlled label, and the terminal failure
+        // sticks across the executor restart
+        Assert.assertEquals(3, client.requestLabels().size());
+        for (String label : client.requestLabels()) {
+            Assert.assertNull(label);
+        }
         streamLoad.start();
         Assert.assertThrows(DorisException.class, streamLoad::checkException);
+        streamLoad.close();
+    }
+
+    @Test
+    public void groupCommitTransientFailureRecovers() throws Exception {
+        ScriptedHttpClient client = new ScriptedHttpClient();
+        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
+        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
+        AsyncDorisStreamLoad streamLoad = newStreamLoad(client, groupCommitOptions());
+
+        RecordBuffer multiRecord = new RecordBuffer();
+        multiRecord.insert("{\"id\":\"g1\"}");
+        multiRecord.insert("{\"id\":\"g2\"}");
+        streamLoad.flush("label-gc-recover", multiRecord);
+        // blocks through the failed attempt and its successful retry
+        streamLoad.forceFlush();
+
+        streamLoad.checkException();
+        Assert.assertEquals(2, client.requestLabels().size());
+        for (String label : client.requestLabels()) {
+            Assert.assertNull(label);
+        }
+        Assert.assertArrayEquals(client.requestBodies().get(0), client.requestBodies().get(1));
         streamLoad.close();
     }
 
