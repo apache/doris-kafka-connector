@@ -126,7 +126,6 @@ public class AsyncDorisStreamLoad extends DataLoad {
     public void start() {
         if (!loadThreadAlive) {
             this.loadExecutorService.execute(loadAsyncExecutor);
-            this.exception.set(null);
         }
     }
 
@@ -204,7 +203,7 @@ public class AsyncDorisStreamLoad extends DataLoad {
                         // When the label is empty, it is the eof buffer for checkpoint flush.
                         continue;
                     }
-                    load(buffer.getLabel(), buffer);
+                    loadWithRetry(buffer);
 
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -224,6 +223,23 @@ public class AsyncDorisStreamLoad extends DataLoad {
             }
             LOG.info("LoadAsyncExecutor stop");
             loadThreadAlive = false;
+        }
+
+        private void loadWithRetry(RecordBuffer buffer) throws IOException, InterruptedException {
+            String label = buffer.getLabel();
+            for (int retry = 0; retry <= dorisOptions.getMaxRetries(); retry++) {
+                try {
+                    load(label, buffer);
+                    return;
+                } catch (Exception e) {
+                    if (retry == dorisOptions.getMaxRetries()) {
+                        throw e;
+                    }
+                    LOG.warn("stream load failed for label {}, will retry", label, e);
+                    label = buffer.getLabel() + "_" + (retry + 1);
+                    Thread.sleep(dorisOptions.getRetryIntervalMs());
+                }
+            }
         }
 
         /** execute stream load. */
