@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.doris.kafka.connector.DorisSinkTask;
@@ -65,7 +66,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
     private static final Logger LOG = LoggerFactory.getLogger(DorisDefaultSinkService.class);
 
     protected final ConnectionProvider conn;
-    protected final Map<String, DorisWriter> writer;
+    protected final Map<WriterKey, DorisWriter> writer;
     protected final DorisOptions dorisOptions;
     protected final DorisSystemService dorisSystemService;
     protected final MetricsJmxReporter metricsJmxReporter;
@@ -113,8 +114,8 @@ public class DorisDefaultSinkService implements DorisSinkService {
     @Override
     public void startTask(final String tableName, final TopicPartition topicPartition) {
         // check if the task is already started
-        String writerKey =
-                getWriterKey(topicPartition.topic(), topicPartition.partition(), tableName);
+        WriterKey writerKey =
+                new WriterKey(topicPartition.topic(), topicPartition.partition(), tableName);
         if (writer.containsKey(writerKey)) {
             LOG.info("already start task");
         } else {
@@ -169,7 +170,7 @@ public class DorisDefaultSinkService implements DorisSinkService {
     @Override
     public void insert(SinkRecord record) {
         String tableName = getSinkDorisTableName(record);
-        String writerKey = getWriterKey(record.topic(), record.kafkaPartition(), tableName);
+        WriterKey writerKey = new WriterKey(record.topic(), record.kafkaPartition(), tableName);
         // init a new topic partition
         if (!writer.containsKey(writerKey)) {
             startTask(tableName, new TopicPartition(record.topic(), record.kafkaPartition()));
@@ -179,11 +180,17 @@ public class DorisDefaultSinkService implements DorisSinkService {
 
     @Override
     public long getOffset(final TopicPartition topicPartition) {
-        String tpName = getNameIndex(topicPartition.topic(), topicPartition.partition());
-        // get all writers for the topic partition
+        // select exactly the writers of this topic-partition (all tables routed to it via
+        // 'record.tablename.field'); a string-prefix match would wrongly include other
+        // topic-partitions, e.g. writers of partition 1 when asked for partition 10
         List<DorisWriter> writers =
                 writer.entrySet().stream()
-                        .filter(entry -> entry.getKey().startsWith(tpName))
+                        .filter(
+                                entry ->
+                                        entry.getKey()
+                                                .isFor(
+                                                        topicPartition.topic(),
+                                                        topicPartition.partition()))
                         .map(Map.Entry::getValue)
                         .collect(Collectors.toList());
         if (writers.isEmpty()) {
@@ -193,8 +200,37 @@ public class DorisDefaultSinkService implements DorisSinkService {
                     topicPartition.partition());
             return 0;
         }
-        // return the max offset of all writers
-        return writers.stream().map(DorisWriter::getOffset).reduce(Long::max).orElse(0L);
+        // A topic-partition may be routed to multiple tables via 'record.tablename.field', each
+        // with its own writer. Reporting the max of per-writer offsets would claim records as
+        // consumed that are still buffered in another writer; after a crash they would be lost.
+        // The safe watermark is contiguous: the earliest offset still buffered in any writer, or
+        // (when every writer's buffer is empty) the max of the per-writer committed offsets.
+        // DorisSinkTask calls commit() (which commits buffered batches to Doris and throws on
+        // failure) before getOffset(), so a writer whose buffer is empty has all its records
+        // durably committed at this point.
+
+        // Finalize every writer's commit state first: DorisWriter.getOffset() is not a pure
+        // accessor (StreamLoadWriter advances committedOffset from flushedOffset and clears its
+        // committable list, CopyIntoWriter clears its uploaded file list). Finalizing is valid
+        // because preCommit runs commit() — which makes the flushed batches durable or throws,
+        // aborting preCommit before any offset is returned — before getOffset(). Skipping the
+        // finalization when another writer still buffers records would leave completed
+        // transactions pending and re-commit them on the next cycle.
+        long maxCommitted = 0;
+        for (DorisWriter dorisWriter : writers) {
+            maxCommitted = Math.max(maxCommitted, dorisWriter.getOffset());
+        }
+
+        long minFirstBufferedOffset =
+                writers.stream()
+                        .map(DorisWriter::getFirstBufferedOffset)
+                        .filter(offset -> offset >= 0)
+                        .reduce(Long::min)
+                        .orElse(-1L);
+        if (minFirstBufferedOffset >= 0) {
+            return minFirstBufferedOffset;
+        }
+        return maxCommitted;
     }
 
     @Override
@@ -207,13 +243,14 @@ public class DorisDefaultSinkService implements DorisSinkService {
         offsets.keySet()
                 .forEach(
                         tp -> {
-                            String tpName = getNameIndex(tp.topic(), tp.partition());
-                            // commit all writers that match the topic and partition
-                            for (Map.Entry<String, DorisWriter> entry : writer.entrySet()) {
-                                if (entry.getKey().startsWith(tpName)) {
-                                    entry.getValue().commit(tp.partition());
-                                }
-                            }
+                            // commit exactly the writers of this topic-partition (all tables);
+                            // same exact-identity selection as getOffset()
+                            writer.entrySet().stream()
+                                    .filter(
+                                            entry ->
+                                                    entry.getKey()
+                                                            .isFor(tp.topic(), tp.partition()))
+                                    .forEach(entry -> entry.getValue().commit(tp.partition()));
                         });
     }
 
@@ -302,22 +339,74 @@ public class DorisDefaultSinkService implements DorisSinkService {
         return recordMap.get(tableNameField).toString();
     }
 
-    private static String getNameIndex(String topic, int partition) {
-        return topic + "_" + partition;
+    /** Inserts the record and returns the (pre-existing or newly created) writer it went to. */
+    @VisibleForTesting
+    StreamLoadWriter insertAndReturnWriter(SinkRecord record) {
+        insert(record);
+        return writerOf(record.topic(), record.kafkaPartition(), getSinkDorisTableName(record));
+    }
+
+    /** The writer responsible for the given topic-partition + table, or null if none exists. */
+    @VisibleForTesting
+    StreamLoadWriter writerOf(String topic, int partition, String tableName) {
+        return (StreamLoadWriter) writer.get(new WriterKey(topic, partition, tableName));
     }
 
     /**
-     * Parse the writer unique key
-     *
-     * @param topic topic name
-     * @param partition partition number
-     * @param tableName table name
-     * @return writer key
+     * Commits all writers of the given topic-partition, mirroring what {@link
+     * DorisSinkTask#preCommit} does via {@link #commit(Map)}.
      */
-    private String getWriterKey(String topic, int partition, String tableName) {
-        if (dorisOptions.getTopicMapTable(topic).equals(tableName)) {
-            return topic + "_" + partition;
+    @VisibleForTesting
+    void commitOffsets(TopicPartition topicPartition) {
+        Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
+        offsets.put(topicPartition, new OffsetAndMetadata(0L));
+        commit(offsets);
+    }
+
+    /**
+     * Structured, exact-identity key of a writer: one Kafka topic-partition routed to one Doris
+     * table. Replaces the previous string-prefix key matching, which could select writers of
+     * another topic-partition (e.g. topic-partition 1 also matching the key prefix of
+     * topic-partition 10) and aggregate unrelated writers into getOffset()/commit().
+     */
+    static final class WriterKey {
+        private final String topic;
+        private final int partition;
+        private final String tableName;
+
+        WriterKey(String topic, int partition, String tableName) {
+            this.topic = topic;
+            this.partition = partition;
+            this.tableName = tableName;
         }
-        return topic + "_" + partition + "_" + tableName;
+
+        /** Whether this key identifies a writer of exactly the given topic-partition. */
+        boolean isFor(String topic, int partition) {
+            return this.topic.equals(topic) && this.partition == partition;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            WriterKey writerKey = (WriterKey) o;
+            return partition == writerKey.partition
+                    && topic.equals(writerKey.topic)
+                    && tableName.equals(writerKey.tableName);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(topic, partition, tableName);
+        }
+
+        @Override
+        public String toString() {
+            return topic + "_" + partition + "_" + tableName;
+        }
     }
 }

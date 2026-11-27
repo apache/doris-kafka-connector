@@ -59,8 +59,10 @@ public class DorisCombinedSinkServiceTest {
         DorisCombinedSinkService service = service();
         DorisWriter firstWriter = mock(DorisWriter.class);
         DorisWriter secondWriter = mock(DorisWriter.class);
-        service.writer.put("first", firstWriter);
-        service.writer.put("second", secondWriter);
+        service.writer.put(
+                new DorisDefaultSinkService.WriterKey("first", -1, "first"), firstWriter);
+        service.writer.put(
+                new DorisDefaultSinkService.WriterKey("second", -1, "second"), secondWriter);
 
         service.commit(Collections.emptyMap());
 
@@ -74,7 +76,7 @@ public class DorisCombinedSinkServiceTest {
         DorisCombinedSinkService service = service();
         DorisWriter writer = mock(DorisWriter.class);
         doThrow(new DorisException("load failed")).when(writer).commitFlush();
-        service.writer.put("writer", writer);
+        service.writer.put(new DorisDefaultSinkService.WriterKey("writer", -1, "writer"), writer);
         TopicPartition partition = new TopicPartition("orders-topic", 0);
         Map<TopicPartition, OffsetAndMetadata> offsets =
                 Collections.singletonMap(partition, new OffsetAndMetadata(6));
@@ -88,7 +90,8 @@ public class DorisCombinedSinkServiceTest {
         DorisCombinedSinkService service = service();
         DorisWriter writer = mock(DorisWriter.class);
         when(writer.shouldFlush()).thenReturn(true);
-        service.writer.put("orders-topic", writer);
+        service.writer.put(
+                new DorisDefaultSinkService.WriterKey("orders-topic", -1, "orders"), writer);
         SinkRecord record =
                 new SinkRecord(
                         "orders-topic",
