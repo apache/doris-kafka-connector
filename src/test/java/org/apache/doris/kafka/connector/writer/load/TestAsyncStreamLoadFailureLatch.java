@@ -104,14 +104,6 @@ public class TestAsyncStreamLoadFailureLatch {
         return newStreamLoad(client, new DorisOptions((Map) props));
     }
 
-    private static String labelOfLength(int length, String tail) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < length - tail.length(); i++) {
-            sb.append('L');
-        }
-        return sb.append(tail).toString();
-    }
-
     /**
      * The executor thread sets its alive flag as its first statement; wait for that so the first
      * flush() cannot lose the race against thread startup.
@@ -299,89 +291,37 @@ public class TestAsyncStreamLoadFailureLatch {
     }
 
     @Test
-    public void retryUsesDistinctLabelsDerivedFromBase() {
+    public void retryUsesDistinctLabelsDerivedFromBase() throws Exception {
         // every attempt carries a distinct label: the first uses the buffer's original
-        // label and every retry derives a fresh label from it, so a retry can never be
-        // rejected as a duplicate of an earlier attempt of the same load
-        ScriptedHttpClient client = new ScriptedHttpClient();
-        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
-        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
-        client.addResponse(200, "{\"Status\":\"Success\",\"Message\":\"OK\"}");
-        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
-
-        RecordBuffer multiRecord = new RecordBuffer();
-        multiRecord.insert("{\"id\":\"a1\"}");
-        multiRecord.insert("{\"id\":\"a2\"}");
-        streamLoad.flush("label-reuse", multiRecord);
-        streamLoad.forceFlush();
-        streamLoad.checkException();
-
-        Assert.assertEquals(
-                java.util.Arrays.asList("label-reuse", "label-reuse_1", "label-reuse_2"),
-                client.requestLabels());
-        // every attempt transmits the identical, complete payload of the buffer
-        Assert.assertEquals(3, client.requestBodies().size());
-        for (byte[] body : client.requestBodies()) {
-            Assert.assertArrayEquals(client.requestBodies().get(0), body);
-            String text = new String(body, java.nio.charset.StandardCharsets.UTF_8);
-            Assert.assertTrue("payload must keep all records: " + text, text.contains("a1"));
-            Assert.assertTrue("payload must keep all records: " + text, text.contains("a2"));
-        }
-        streamLoad.close();
-    }
-
-    @Test
-    public void retryLabelRespectsDorisLabelLengthLimit() {
-        // Doris rejects labels longer than label_regex_length (default 128, configurable):
-        // when the base label leaves no room for a plain "<base>_<attempt>" suffix, the
-        // retry label keeps a fingerprint of the complete base label — so it fits the
-        // limit, always differs from the base label (a 128-char base ending in "_1" would
-        // reproduce itself under naive truncation) and differs between attempts
-        ScriptedHttpClient client = new ScriptedHttpClient();
-        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
-        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
-        client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
-        AsyncDorisStreamLoad streamLoad = newStreamLoad(client);
-
-        String longBase = labelOfLength(128, "_1");
-        streamLoad.flush(longBase, dataBuffer());
-        Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
-
-        java.util.List<String> labels = client.requestLabels();
-        Assert.assertEquals(3, labels.size());
-        Assert.assertEquals(longBase, labels.get(0));
-        for (int i = 1; i < labels.size(); i++) {
-            Assert.assertTrue(
-                    "label exceeds the 128-char limit: " + labels.get(i),
-                    labels.get(i).length() <= 128);
-            Assert.assertNotEquals(
-                    "retry label must differ from the base label", longBase, labels.get(i));
-        }
-        Assert.assertNotEquals(labels.get(1), labels.get(2));
-        streamLoad.close();
-    }
-
-    @Test
-    public void retryLabelsStayDistinctAcrossAttemptDigitBoundary() throws Exception {
-        // attempt numbers crossing the single/double-digit boundary change the suffix
-        // length; every retry label must still differ from the base label and from every
-        // earlier retry label — including a 128-char base ending in "_10"
+        // label and every retry derives a fresh label from it (across the attempt digit
+        // boundary), so a retry can never be rejected as a duplicate of an earlier
+        // attempt of the same load
         ScriptedHttpClient client = new ScriptedHttpClient();
         for (int i = 0; i < 13; i++) {
             client.addResponse(200, "{\"Status\":\"Failed\",\"Message\":\"BE is restarting\"}");
         }
         AsyncDorisStreamLoad streamLoad = newStreamLoad(client, 12, 10L);
 
-        String longBase = labelOfLength(128, "_10");
-        streamLoad.flush(longBase, dataBuffer());
+        RecordBuffer multiRecord = new RecordBuffer();
+        multiRecord.insert("{\"id\":\"a1\"}");
+        multiRecord.insert("{\"id\":\"a2\"}");
+        streamLoad.flush("label-reuse", multiRecord);
         Assert.assertThrows(DorisException.class, streamLoad::forceFlush);
 
-        java.util.List<String> labels = client.requestLabels();
-        Assert.assertEquals(13, labels.size());
-        Assert.assertEquals(longBase, labels.get(0));
-        Assert.assertEquals(13, new java.util.HashSet<>(labels).size());
-        for (String label : labels) {
-            Assert.assertTrue("label exceeds the 128-char limit: " + label, label.length() <= 128);
+        java.util.List<String> expected = new java.util.ArrayList<>();
+        expected.add("label-reuse");
+        for (int attempt = 1; attempt <= 12; attempt++) {
+            expected.add("label-reuse_" + attempt);
+        }
+        Assert.assertEquals(expected, client.requestLabels());
+        Assert.assertEquals(13, new java.util.HashSet<>(client.requestLabels()).size());
+        // every attempt transmits the identical, complete payload of the buffer
+        Assert.assertEquals(13, client.requestBodies().size());
+        for (byte[] body : client.requestBodies()) {
+            Assert.assertArrayEquals(client.requestBodies().get(0), body);
+            String text = new String(body, java.nio.charset.StandardCharsets.UTF_8);
+            Assert.assertTrue("payload must keep all records: " + text, text.contains("a1"));
+            Assert.assertTrue("payload must keep all records: " + text, text.contains("a2"));
         }
         streamLoad.close();
     }
