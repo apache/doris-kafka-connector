@@ -35,24 +35,6 @@ github:
     merge:   false
     rebase:  false
 
-  # Keep the existing classic protection on master during ruleset rollout.
-  protected_branches:
-    master:
-      required_pull_request_reviews:
-        dismiss_stale_reviews: true
-        required_approving_review_count: 1
-      required_status_checks:
-        strict: false
-        checks:
-          - context: Build Doris Kafka Connector
-            app_id: 15368
-          - context: CheckStyle
-            app_id: 15368
-          - context: License Check
-            app_id: 15368
-          - context: e2e test case
-            app_id: 15368
-
   rulesets:
     - name: Default and release branch protection
       type: branch
