@@ -50,7 +50,7 @@ import org.testcontainers.utility.MountableFile;
 public class DorisContainerServiceImpl implements DorisContainerService {
     protected static final Logger LOG = LoggerFactory.getLogger(DorisContainerServiceImpl.class);
     protected static final String DORIS_DOCKER_IMAGE =
-            System.getProperty("image", "jnsimba/doris-all-in-one:4.1.3");
+            System.getProperty("image", "apache/doris:all-in-one-4.1.5-full");
     private static final String DRIVER_JAR =
             "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.16/mysql-connector-java-8.0.16.jar";
     protected static final String JDBC_URL = "jdbc:mysql://%s:9030";
