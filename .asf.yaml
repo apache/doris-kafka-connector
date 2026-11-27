@@ -66,6 +66,24 @@ github:
         dismiss_stale_reviews: true
         required_approving_review_count: 1
 
+    - name: Master branch required checks
+      type: branch
+      branches:
+        includes:
+          - master
+      restrict_deletion: false
+      restrict_force_push: false
+      required_status_checks_strict: false
+      required_status_checks:
+        - name: Build Doris Kafka Connector
+          app_slug: 15368
+        - name: CheckStyle
+          app_slug: 15368
+        - name: License Check
+          app_slug: 15368
+        - name: e2e test case
+          app_slug: 15368
+
   features:
     issues: true
     projects: true
